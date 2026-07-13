@@ -12,7 +12,7 @@ Live site: https://capulongfarms.github.io/automation_home/
 
 - **`index.html` is now a dashboard/landing page, not a device page** (changed 2026-07-13) — pure navigation (two cards linking out), no Firebase calls of its own. Local source: `Home/index.html` in the workspace. Each actual device still gets its own self-contained page (HTML/CSS/JS, no shared includes), deployed via GitHub Pages directly from `main` / root on every push:
   - `index.html` — **Dashboard** (links to the pages below)
-  - `Button.html` — Button_LED
+  - `button.html` — Button_LED
   - `incubator.html` — Incubator
 - **Firebase Authentication** (email/password) gates access on each device page — only signed-in users can read or write device state. The dashboard itself has no auth gate since it shows no device data.
 - **Cloud Firestore** (project `automation-home-4b86f`) holds live device state, one document per device under the `devices` collection (e.g. `devices/button_led`).
@@ -26,7 +26,7 @@ Live site: https://capulongfarms.github.io/automation_home/
 
 | Firestore document | Device | Page | Description |
 |---|---|---|---|
-| `devices/button_led` | ESP32 Button_LED | `Button.html` | Home LED toggle via physical button (GPIO 25), local web page (AP fallback), or this remote app |
+| `devices/button_led` | ESP32 Button_LED | `button.html` | Home LED toggle via physical button (GPIO 25), local web page (AP fallback), or this remote app |
 | `devices/incubator` | ESP32 Incubator | `incubator.html` | Egg incubator: heater/humidifier (auto + manual override), fan, light, servo egg-turner. Also has a fully standalone local LCD+IR-remote menu, no WiFi required — this remote page is a convenience, not a dependency. |
 
 ## Firebase Project
