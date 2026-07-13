@@ -93,9 +93,9 @@
   .btn-on   { background: #4CAF50; }
   .btn-off  { background: #999; }
   .mode-badge { padding: 4px 9px; border-radius: 12px; font-size: 0.72em; font-weight: 700; color: white; border: none; cursor: pointer; }
-  .mode-badge.auto       { background: #007BFF; }
-  .mode-badge.manual-on  { background: #4CAF50; }
-  .mode-badge.manual-off { background: #777; }
+  .mode-badge.auto   { background: #007BFF; }
+  .mode-badge.manual { background: #7c4dff; }
+  .mode-na { color: #aaa; font-size: 0.78em; }
   .turn-now-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; background: #a3690a; color: white; font-size: 0.95em; cursor: pointer; }
 
   #syncNote { color: #999; font-size: 0.8em; margin: 4px 0 12px; min-height: 1.2em; text-align: center; }
@@ -133,13 +133,15 @@
           <td><button class="btn btn-save" onclick="saveHum()">Save</button></td></tr>
       </table>
       <table>
-        <tr><th></th><th>Status</th><th>Manual ON</th><th>Manual OFF</th></tr>
+        <tr><th></th><th>Mode</th><th>Status</th><th>Manual ON</th><th>Manual OFF</th></tr>
         <tr><td>Heater</td>
           <td><button class="mode-badge auto" id="heaterModeBadge" onclick="setMode('Heater','auto')">AUTO</button></td>
+          <td><span class="badge off" id="heaterStatusBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setMode('Heater','on')">ON</button></td>
           <td><button class="btn btn-off" onclick="setMode('Heater','off')">OFF</button></td></tr>
         <tr><td>Humidifier</td>
           <td><button class="mode-badge auto" id="humidModeBadge" onclick="setMode('Humidifier','auto')">AUTO</button></td>
+          <td><span class="badge off" id="humidStatusBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setMode('Humidifier','on')">ON</button></td>
           <td><button class="btn btn-off" onclick="setMode('Humidifier','off')">OFF</button></td></tr>
       </table>
@@ -148,12 +150,14 @@
     <div class="group group2">
       <h3>Fan and Lighting Control</h3>
       <table>
-        <tr><th></th><th>Status</th><th>Manual ON</th><th>Manual OFF</th></tr>
+        <tr><th></th><th>Mode</th><th>Status</th><th>Manual ON</th><th>Manual OFF</th></tr>
         <tr><td>Fan</td>
           <td><button class="mode-badge auto" id="fanModeBadge" onclick="setMode('Fan','auto')">AUTO</button></td>
+          <td><span class="badge off" id="fanStatusBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setMode('Fan','on')">ON</button></td>
           <td><button class="btn btn-off" onclick="setMode('Fan','off')">OFF</button></td></tr>
         <tr><td>Light</td>
+          <td><span class="mode-na">&mdash;</span></td>
           <td><span class="badge off" id="lightBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setLight('on')">ON</button></td>
           <td><button class="btn btn-off" onclick="setLight('off')">OFF</button></td></tr>
@@ -227,20 +231,22 @@
     el.className = 'badge ' + (state ? 'on' : 'off');
   }
 
-  function setModeBadge(id, on, override) {
+  function setModeBadge(id, override) {
     const el = $(id);
     if (!override) { el.textContent = 'AUTO'; el.className = 'mode-badge auto'; }
-    else if (on) { el.textContent = 'MANUAL·ON'; el.className = 'mode-badge manual-on'; }
-    else { el.textContent = 'MANUAL·OFF'; el.className = 'mode-badge manual-off'; }
+    else { el.textContent = 'MANUAL'; el.className = 'mode-badge manual'; }
   }
 
   function renderState(data) {
     latestState = data;
     $('tempReadout').innerHTML = (typeof data.temperature === 'number' ? data.temperature.toFixed(1) : '--') + ' &deg;C';
     $('humReadout').textContent = (typeof data.humidity === 'number' ? data.humidity.toFixed(0) : '--') + ' %';
-    setModeBadge('heaterModeBadge', !!data.heaterOn, !!data.heaterManualOverride);
-    setModeBadge('humidModeBadge', !!data.humidifierOn, !!data.humidifierManualOverride);
-    setModeBadge('fanModeBadge', !!data.fanOn, !!data.fanManualOverride);
+    setModeBadge('heaterModeBadge', !!data.heaterManualOverride);
+    setBadge('heaterStatusBadge', !!data.heaterOn);
+    setModeBadge('humidModeBadge', !!data.humidifierManualOverride);
+    setBadge('humidStatusBadge', !!data.humidifierOn);
+    setModeBadge('fanModeBadge', !!data.fanManualOverride);
+    setBadge('fanStatusBadge', !!data.fanOn);
     setBadge('lightBadge', !!data.lightOn);
     $('turnCurrent').textContent = (data.turnIntervalMinutes ?? 120) + ' min';
 
