@@ -106,6 +106,9 @@
   .mode-select-btn { flex: 1; padding: 8px; border: none; border-radius: 8px; background: #ddd; color: #333; font-size: 0.82em; font-weight: 600; cursor: pointer; }
   .mode-select-btn.active { background: #6a1b9a; color: white; }
   .hatcher-note { color: #999; font-size: 0.82em; padding: 4px 0; }
+  .egg-type-row { display: flex; align-items: center; gap: 8px; margin-bottom: 10px; }
+  .egg-type-row label { font-size: 0.82em; font-weight: 600; color: #6a1b9a; }
+  .egg-type-row select { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9em; background: white; }
 
   #syncNote { color: #999; font-size: 0.8em; margin: 4px 0 12px; min-height: 1.2em; text-align: center; }
   #signOutBtn {
@@ -131,7 +134,17 @@
     <h2>Incubator Control</h2>
 
     <div class="group group0">
-      <h3>Operation Mode</h3>
+      <h3>Egg Type &amp; Operation Mode</h3>
+      <div class="egg-type-row">
+        <label for="eggTypeSelect">Egg Type</label>
+        <select id="eggTypeSelect" onchange="setEggType(this.value)">
+          <option value="Chicken">Chicken</option>
+          <option value="Duck">Duck</option>
+          <option value="Goose">Goose</option>
+          <option value="Pigeon">Pigeon</option>
+          <option value="Quail">Quail</option>
+        </select>
+      </div>
       <table>
         <tr><th></th><th>Mode</th><th>Progress</th><th></th></tr>
         <tr><td>Cycle</td>
@@ -281,6 +294,7 @@
     $('opModeBadge').textContent = isHatcher ? 'HATCHER' : 'INCUBATOR';
     $('opModeBadge').className = 'badge-mode ' + (isHatcher ? 'hatcher' : 'incubator');
     $('cycleProgress').textContent = 'Day ' + (data.cycleDay ?? '--') + '/' + (data.cycleDurationDays ?? '--');
+    $('eggTypeSelect').value = data.eggType ?? 'Chicken';
     $('selectIncubatorBtn').className = 'mode-select-btn' + (isHatcher ? '' : ' active');
     $('selectHatcherBtn').className = 'mode-select-btn' + (isHatcher ? ' active' : '');
     $('eggTurningControls').style.display = isHatcher ? 'none' : 'block';
@@ -365,11 +379,22 @@
     }
   };
 
-  // mode: 'incubator' | 'hatcher' - device applies that mode's reference chicken-egg
-  // temp/humidity defaults and restarts its cycle day-count at Day 1.
+  // mode: 'incubator' | 'hatcher' - device applies that egg type's reference
+  // temp/humidity defaults for that phase and restarts its cycle day-count at Day 1.
   window.setOperationMode = async function (mode) {
     try {
       await setDoc(stateDocRef, { operationMode: mode }, { merge: true });
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  // type: 'Chicken' | 'Duck' | 'Goose' | 'Pigeon' | 'Quail' - the PARENT selection;
+  // changing it reloads the current mode's reference values for the new species
+  // and restarts the cycle at Day 1, same as switching Operation Mode does.
+  window.setEggType = async function (type) {
+    try {
+      await setDoc(stateDocRef, { eggType: type }, { merge: true });
     } catch (e) {
       $('syncNote').textContent = 'Update failed: ' + e.message;
     }
