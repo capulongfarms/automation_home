@@ -10,21 +10,23 @@ Live site: https://capulongfarms.github.io/automation_home/
 
 ## Architecture
 
-- Static site, no build step — each device gets its own self-contained page (HTML/CSS/JS, no shared includes), deployed via GitHub Pages directly from `main` / root on every push:
-  - `index.html` — Button_LED
+- **`index.html` is now a dashboard/landing page, not a device page** (changed 2026-07-13) — pure navigation (two cards linking out), no Firebase calls of its own. Local source: `Home/index.html` in the workspace. Each actual device still gets its own self-contained page (HTML/CSS/JS, no shared includes), deployed via GitHub Pages directly from `main` / root on every push:
+  - `index.html` — **Dashboard** (links to the pages below)
+  - `Button.html` — Button_LED
   - `incubator.html` — Incubator
-- **Firebase Authentication** (email/password) gates access — only signed-in users can read or write device state.
+- **Firebase Authentication** (email/password) gates access on each device page — only signed-in users can read or write device state. The dashboard itself has no auth gate since it shows no device data.
 - **Cloud Firestore** (project `automation-home-4b86f`) holds live device state, one document per device under the `devices` collection (e.g. `devices/button_led`).
 - Real-time sync on the web side via Firestore's `onSnapshot` listener — no polling.
 - ESP32 firmware source is **not** in this repo — it lives locally at (Capulong Farms workspace, tracked in a separate repo):
   - `ESP32 Softwares/3. Code and Libraries/Code/1.Button_LED/1.Button_LED.ino`
   - `ESP32 Softwares/3. Code and Libraries/Code/12.Incubator/12.Incubator.ino`
+  - The workspace also has a `ESP32 Softwares/3. Code and Libraries/Code/Home/` folder — no firmware, just the dashboard's local source, a multi-root `.code-workspace`, and a `README.md` describing this whole deployment strategy (including how to add a new project's page).
 
 ## Devices
 
 | Firestore document | Device | Page | Description |
 |---|---|---|---|
-| `devices/button_led` | ESP32 Button_LED | `index.html` | Home LED toggle via physical button (GPIO 25), local web page (AP fallback), or this remote app |
+| `devices/button_led` | ESP32 Button_LED | `Button.html` | Home LED toggle via physical button (GPIO 25), local web page (AP fallback), or this remote app |
 | `devices/incubator` | ESP32 Incubator | `incubator.html` | Egg incubator: heater/humidifier (auto + manual override), fan, light, servo egg-turner. Also has a fully standalone local LCD+IR-remote menu, no WiFi required — this remote page is a convenience, not a dependency. |
 
 ## Firebase Project
@@ -41,4 +43,4 @@ Live site: https://capulongfarms.github.io/automation_home/
 - **The `firebaseConfig` values in `index.html` are not secret.** `apiKey`, `projectId`, etc. are meant to be public; real access control is enforced server-side by Firestore Security Rules, not by hiding this config.
 - **A client-side password prompt is not a security boundary.** The whole page downloads before any JS check runs, so it can be read or bypassed. Auth must go through Firebase Authentication + Security Rules, not app-level checks.
 - **The ESP32 side has no real-time listener.** Firestore access via the Firebase-ESP-Client Arduino library is REST-based, so the device polls every ~3 seconds rather than subscribing to a stream. The web app, by contrast, updates instantly via `onSnapshot`.
-- **Adding a new device:** create a new document under `devices/`, give the new ESP32 its own dedicated Firebase Auth account (never reuse another device's credentials), and add its UID to the Firestore Security Rules.
+- **Adding a new device:** create a new document under `devices/`, give the new ESP32 its own dedicated Firebase Auth account (never reuse another device's credentials), add its UID to the Firestore Security Rules, deploy its page here under its own name (e.g. `newdevice.html`), and add a card for it to `index.html` (the dashboard) — full checklist in the workspace's `Home/README.md`.

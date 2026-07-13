@@ -3,205 +3,91 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>Button_LED Remote Control</title>
+<title>Capulong Farms Automation</title>
 <style>
   body {
     font-family: Arial, sans-serif;
+    margin: 0;
+    min-height: 100vh;
+    background-color: #f0f0f0;
+    color: #333;
     display: flex;
     flex-direction: column;
-    justify-content: center;
     align-items: center;
-    min-height: 100vh;
-    margin: 0;
-    background-color: #f0f0f0;
+    padding: 48px 20px;
+    box-sizing: border-box;
   }
-  h2 { color: #333; margin-bottom: 8px; }
-  .subtitle { color: #777; font-size: 0.9em; margin-bottom: 24px; }
+  header { text-align: center; margin-bottom: 36px; }
+  h1 { margin: 0 0 8px; font-size: 1.8em; color: #222; }
+  .subtitle { color: #777; font-size: 0.95em; }
 
-  /* ---------- Login screen ---------- */
-  #loginScreen {
+  .grid {
+    display: flex;
+    flex-wrap: wrap;
+    justify-content: center;
+    gap: 20px;
+    width: 100%;
+    max-width: 720px;
+  }
+
+  .card {
     background: white;
-    padding: 32px 28px;
     border-radius: 12px;
     box-shadow: 0 2px 10px rgba(0,0,0,0.1);
-    width: 100%;
-    max-width: 320px;
-    box-sizing: border-box;
+    padding: 28px 24px;
+    width: 260px;
+    text-align: center;
+    display: flex;
+    flex-direction: column;
+  }
+  .card h2 { margin: 0 0 8px; font-size: 1.2em; color: #222; }
+  .card p { color: #777; font-size: 0.88em; margin: 0 0 20px; flex-grow: 1; line-height: 1.4; }
+  .card a {
+    display: inline-block;
+    padding: 10px 20px;
+    border-radius: 8px;
+    background-color: #007BFF;
+    color: white;
+    text-decoration: none;
+    font-size: 0.95em;
+    font-weight: 600;
+    transition: background-color 0.2s;
+  }
+  .card a:hover { background-color: #0056b3; }
+
+  .card.button-led a { background-color: #4CAF50; }
+  .card.button-led a:hover { background-color: #388e3c; }
+
+  footer {
+    margin-top: 48px;
+    color: #aaa;
+    font-size: 0.8em;
     text-align: center;
   }
-  #loginScreen input {
-    width: 100%;
-    padding: 12px;
-    margin: 8px 0;
-    border: 1px solid #ddd;
-    border-radius: 6px;
-    box-sizing: border-box;
-    font-size: 1em;
-  }
-  #loginScreen button {
-    width: 100%;
-    padding: 12px;
-    margin-top: 8px;
-    border: none;
-    border-radius: 6px;
-    background-color: #4CAF50;
-    color: white;
-    font-size: 1em;
-    cursor: pointer;
-  }
-  #loginScreen button:hover { background-color: #45a049; }
-  #loginError {
-    color: #d32f2f;
-    font-size: 0.85em;
-    margin-top: 10px;
-    min-height: 1.2em;
-  }
-
-  /* ---------- Control screen ---------- */
-  #controlScreen { display: none; text-align: center; }
-
-  #ledIcon { width: 60px; height: 100px; margin: 20px auto; position: relative; }
-  #ledIcon .bulb {
-    width: 60px; height: 60px; border-radius: 50%;
-    background-color: #f44336; margin: 0 auto;
-    transition: background-color 0.3s, box-shadow 0.3s;
-  }
-  #ledIcon .base { width: 30px; height: 20px; background-color: #555; margin: -5px auto 0 auto; border-radius: 5px; }
-
-  #ledStateLabel { font-weight: bold; font-size: 1.5em; margin: 10px; }
-  #toggleBtn {
-    padding: 15px 30px; font-size: 1.2em; border: none;
-    border-radius: 8px; cursor: pointer; margin-bottom: 12px;
-  }
-  .on  { background-color: #4CAF50; color: white; }
-  .off { background-color: #f44336; color: white; }
-
-  #syncNote { color: #999; font-size: 0.8em; margin-bottom: 20px; min-height: 1.2em; }
-  #signOutBtn {
-    background: none; border: 1px solid #ccc; color: #666;
-    padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85em;
-  }
-  #userEmail { color: #999; font-size: 0.8em; margin-bottom: 4px; }
 </style>
 </head>
 <body>
 
-  <div id="loginScreen">
-    <h2>Button_LED</h2>
-    <div class="subtitle">Sign in to control your home LED</div>
-    <input type="email" id="emailInput" placeholder="Email" autocomplete="username">
-    <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
-    <button onclick="signIn()">Sign In</button>
-    <div id="loginError"></div>
+  <header>
+    <h1>Capulong Farms Automation</h1>
+    <div class="subtitle">Select a project to view its live controls</div>
+  </header>
+
+  <div class="grid">
+    <div class="card button-led">
+      <h2>Button LED</h2>
+      <p>Home LED toggle via physical button, local web page, or this remote app.</p>
+      <a href="Button.html">Open Button LED &rarr;</a>
+    </div>
+
+    <div class="card">
+      <h2>Incubator</h2>
+      <p>Egg incubator: heater/humidifier, fan, light, and servo egg-turner, with full standalone LCD control.</p>
+      <a href="incubator.html">Open Incubator &rarr;</a>
+    </div>
   </div>
 
-  <div id="controlScreen">
-    <div id="userEmail"></div>
-    <h2>ESP32 LED Control</h2>
-    <div id="ledIcon"><div class="bulb"></div><div class="base"></div></div>
-    <p>LED Status: <span id="ledStateLabel">--</span></p>
-    <button id="toggleBtn" onclick="toggleLED()">Button</button>
-    <div id="syncNote">Connecting...</div>
-    <br>
-    <button id="signOutBtn" onclick="signOutUser()">Sign out</button>
-  </div>
-
-<script type="module">
-  import { initializeApp }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
-  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, doc, setDoc, onSnapshot }
-    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
-
-  // Public web config - safe to expose client-side. Real access control is
-  // enforced server-side by Firestore Security Rules (restricted to specific UIDs),
-  // not by keeping this config secret.
-  const firebaseConfig = {
-    apiKey: "AIzaSyDnk7DM6Cw0P-NBUb9GeMxxaQhE6E6s9GE",
-    authDomain: "automation-home-4b86f.firebaseapp.com",
-    projectId: "automation-home-4b86f",
-    storageBucket: "automation-home-4b86f.firebasestorage.app",
-    messagingSenderId: "145747597471",
-    appId: "1:145747597471:web:08f2f8b32229191a66eaaa"
-  };
-
-  const app  = initializeApp(firebaseConfig);
-  const auth = getAuth(app);
-  const db   = getFirestore(app);
-
-  const stateDocRef = doc(db, "devices", "button_led");
-
-  let currentState = false;
-  let unsubscribeSnapshot = null;
-
-  const $ = id => document.getElementById(id);
-
-  window.signIn = async function () {
-    $('loginError').textContent = '';
-    try {
-      await signInWithEmailAndPassword(auth, $('emailInput').value.trim(), $('passwordInput').value);
-    } catch (e) {
-      $('loginError').textContent = 'Sign-in failed: ' + e.message;
-    }
-  };
-
-  window.signOutUser = async function () {
-    await signOut(auth);
-  };
-
-  window.toggleLED = async function () {
-    const newState = !currentState;
-    $('syncNote').textContent = 'Updating...';
-    try {
-      await setDoc(stateDocRef, { ledState: newState }, { merge: true });
-    } catch (e) {
-      $('syncNote').textContent = 'Update failed: ' + e.message;
-    }
-  };
-
-  function renderState(state) {
-    currentState = state;
-    $('ledStateLabel').textContent = state ? 'ON' : 'OFF';
-    const btn = $('toggleBtn');
-    btn.className = state ? 'on' : 'off';
-    const bulb = document.querySelector('#ledIcon .bulb');
-    if (state) {
-      bulb.style.backgroundColor = '#4CAF50';
-      bulb.style.boxShadow = '0 0 20px #4CAF50, 0 0 40px #4CAF50, 0 0 60px #4CAF50';
-    } else {
-      bulb.style.backgroundColor = '#f44336';
-      bulb.style.boxShadow = '0 0 10px rgba(0,0,0,0.2)';
-    }
-  }
-
-  onAuthStateChanged(auth, (user) => {
-    if (user) {
-      $('loginScreen').style.display = 'none';
-      $('controlScreen').style.display = 'block';
-      $('userEmail').textContent = 'Signed in as ' + user.email;
-
-      unsubscribeSnapshot = onSnapshot(stateDocRef, (snap) => {
-        if (snap.exists()) {
-          renderState(!!snap.data().ledState);
-          $('syncNote').textContent = 'Synced with ESP32';
-        } else {
-          // No document yet - the ESP32 hasn't reported in for the first time.
-          renderState(false);
-          $('syncNote').textContent = 'Waiting for ESP32 to come online...';
-        }
-      }, (err) => {
-        $('syncNote').textContent = 'Sync error: ' + err.message;
-      });
-    } else {
-      if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
-      $('controlScreen').style.display = 'none';
-      $('loginScreen').style.display = 'block';
-      $('emailInput').value = '';
-      $('passwordInput').value = '';
-    }
-  });
-</script>
+  <footer>More automation projects will appear here as they're added.</footer>
 
 </body>
 </html>
