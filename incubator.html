@@ -75,6 +75,7 @@
 
   .group { border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); text-align: left; }
   .group h3 { margin: 0 0 12px; font-size: 1em; }
+  .group0 { background: #f3e8ff; } .group0 h3 { color: #6a1b9a; }
   .group1 { background: #eaf3ff; } .group1 h3 { color: #1565c0; }
   .group2 { background: #eafaf0; } .group2 h3 { color: #2e7d32; }
   .group3 { background: #fff6e3; } .group3 h3 { color: #a3690a; }
@@ -98,6 +99,14 @@
   .mode-na { color: #aaa; font-size: 0.78em; }
   .turn-now-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; background: #a3690a; color: white; font-size: 0.95em; cursor: pointer; }
 
+  .badge-mode { padding: 4px 10px; border-radius: 12px; font-size: 0.78em; font-weight: 700; color: white; }
+  .badge-mode.incubator { background: #007BFF; }
+  .badge-mode.hatcher { background: #a3690a; }
+  .mode-btn-row { display: flex; gap: 8px; margin-top: 8px; }
+  .mode-select-btn { flex: 1; padding: 8px; border: none; border-radius: 8px; background: #ddd; color: #333; font-size: 0.82em; font-weight: 600; cursor: pointer; }
+  .mode-select-btn.active { background: #6a1b9a; color: white; }
+  .hatcher-note { color: #999; font-size: 0.82em; padding: 4px 0; }
+
   #syncNote { color: #999; font-size: 0.8em; margin: 4px 0 12px; min-height: 1.2em; text-align: center; }
   #signOutBtn {
     background: none; border: 1px solid #ccc; color: #666;
@@ -120,6 +129,21 @@
   <div id="controlScreen">
     <div id="userEmail"></div>
     <h2>Incubator Control</h2>
+
+    <div class="group group0">
+      <h3>Operation Mode</h3>
+      <table>
+        <tr><th></th><th>Mode</th><th>Progress</th><th></th></tr>
+        <tr><td>Cycle</td>
+          <td><span class="badge-mode incubator" id="opModeBadge">INCUBATOR</span></td>
+          <td id="cycleProgress">Day --/--</td>
+          <td><button class="btn btn-save" onclick="resetCycle()">Reset</button></td></tr>
+      </table>
+      <div class="mode-btn-row">
+        <button class="mode-select-btn" id="selectIncubatorBtn" onclick="setOperationMode('incubator')">Incubator Mode</button>
+        <button class="mode-select-btn" id="selectHatcherBtn" onclick="setOperationMode('hatcher')">Hatcher Mode</button>
+      </div>
+    </div>
 
     <div class="group group1">
       <h3>Temperature and Humidity</h3>
@@ -166,13 +190,16 @@
 
     <div class="group group3">
       <h3>Egg-Turning</h3>
-      <table>
-        <tr><th></th><th>Current</th><th>Set Value</th><th></th></tr>
-        <tr><td>Turn Interval</td><td id="turnCurrent">--</td>
-          <td><input type="number" id="turnIntervalInput" step="5" min="15" max="1440"></td>
-          <td><button class="btn btn-save" onclick="saveTurnInterval()">Save</button></td></tr>
-      </table>
-      <button class="turn-now-btn" onclick="turnEggsNow()">Turn Eggs Now</button>
+      <div id="eggTurningControls">
+        <table>
+          <tr><th></th><th>Current</th><th>Set Value</th><th></th></tr>
+          <tr><td>Turn Interval</td><td id="turnCurrent">--</td>
+            <td><input type="number" id="turnIntervalInput" step="5" min="15" max="1440"></td>
+            <td><button class="btn btn-save" onclick="saveTurnInterval()">Save</button></td></tr>
+        </table>
+        <button class="turn-now-btn" onclick="turnEggsNow()">Turn Eggs Now</button>
+      </div>
+      <div class="hatcher-note" id="eggTurningNA" style="display:none;">Not applicable in Hatcher Mode &mdash; eggs are not turned during hatching.</div>
     </div>
 
     <div id="syncNote">Connecting...</div>
@@ -250,6 +277,15 @@
     setBadge('lightBadge', !!data.lightOn);
     $('turnCurrent').textContent = (data.turnIntervalMinutes ?? 120) + ' min';
 
+    const isHatcher = data.operationMode === 'hatcher';
+    $('opModeBadge').textContent = isHatcher ? 'HATCHER' : 'INCUBATOR';
+    $('opModeBadge').className = 'badge-mode ' + (isHatcher ? 'hatcher' : 'incubator');
+    $('cycleProgress').textContent = 'Day ' + (data.cycleDay ?? '--') + '/' + (data.cycleDurationDays ?? '--');
+    $('selectIncubatorBtn').className = 'mode-select-btn' + (isHatcher ? '' : ' active');
+    $('selectHatcherBtn').className = 'mode-select-btn' + (isHatcher ? ' active' : '');
+    $('eggTurningControls').style.display = isHatcher ? 'none' : 'block';
+    $('eggTurningNA').style.display = isHatcher ? 'block' : 'none';
+
     if (document.activeElement !== $('targetTempInput')) $('targetTempInput').value = data.targetTemp ?? 37.5;
     if (document.activeElement !== $('targetHumInput')) $('targetHumInput').value = data.targetHumidity ?? 55;
     if (document.activeElement !== $('turnIntervalInput')) $('turnIntervalInput').value = data.turnIntervalMinutes ?? 120;
@@ -326,6 +362,26 @@
       await setDoc(stateDocRef, { lightOn: state === 'on' }, { merge: true });
     } catch (e) {
       $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  // mode: 'incubator' | 'hatcher' - device applies that mode's reference chicken-egg
+  // temp/humidity defaults and restarts its cycle day-count at Day 1.
+  window.setOperationMode = async function (mode) {
+    try {
+      await setDoc(stateDocRef, { operationMode: mode }, { merge: true });
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  window.resetCycle = async function () {
+    $('syncNote').textContent = 'Requesting cycle reset...';
+    try {
+      await setDoc(stateDocRef, { resetCycleRequest: true }, { merge: true });
+      $('syncNote').textContent = 'Reset request sent - device will act within a few seconds';
+    } catch (e) {
+      $('syncNote').textContent = 'Request failed: ' + e.message;
     }
   };
 
