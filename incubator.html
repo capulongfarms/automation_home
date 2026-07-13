@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Incubator Remote Control</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    background-color: #f0f0f0;
+  }
+  h2 { color: #333; margin-bottom: 8px; }
+  .subtitle { color: #777; font-size: 0.9em; margin-bottom: 24px; }
+
+  /* ---------- Login screen ---------- */
+  #loginScreen {
+    background: white;
+    padding: 32px 28px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 320px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  #loginScreen input {
+    width: 100%;
+    padding: 12px;
+    margin: 8px 0;
+    border: 1px solid #ddd;
+    border-radius: 6px;
+    box-sizing: border-box;
+    font-size: 1em;
+  }
+  #loginScreen button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 8px;
+    border: none;
+    border-radius: 6px;
+    background-color: #4CAF50;
+    color: white;
+    font-size: 1em;
+    cursor: pointer;
+  }
+  #loginScreen button:hover { background-color: #45a049; }
+  #loginError {
+    color: #d32f2f;
+    font-size: 0.85em;
+    margin-top: 10px;
+    min-height: 1.2em;
+  }
+
+  /* ---------- Control screen ---------- */
+  #controlScreen {
+    display: none;
+    width: 100%;
+    max-width: 480px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+
+  .readout { display: flex; justify-content: space-between; margin: 6px 0; font-size: 1.05em; }
+  .readout b { font-size: 1.2em; }
+
+  .badge { padding: 4px 10px; border-radius: 12px; color: white; font-weight: 700; font-size: 0.72em; }
+  .badge.on  { background-color: #4CAF50; }
+  .badge.off { background-color: #999; }
+
+  .group { border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); text-align: left; }
+  .group h3 { margin: 0 0 12px; font-size: 1em; }
+  .group1 { background: #eaf3ff; } .group1 h3 { color: #1565c0; }
+  .group2 { background: #eafaf0; } .group2 h3 { color: #2e7d32; }
+  .group3 { background: #fff6e3; } .group3 h3 { color: #a3690a; }
+
+  table { width: 100%; border-collapse: collapse; margin-bottom: 10px; }
+  table:last-of-type { margin-bottom: 0; }
+  th, td { padding: 7px 4px; text-align: center; font-size: 0.82em; }
+  th { color: #666; font-weight: 600; border-bottom: 1px solid rgba(0,0,0,0.1); font-size: 0.7em; text-transform: uppercase; letter-spacing: 0.03em; }
+  td:first-child, th:first-child { text-align: left; font-weight: 600; color: #333; }
+
+  input[type="number"] {
+    width: 56px; padding: 5px; border: 1px solid #ccc; border-radius: 6px; text-align: center; font-size: 0.9em;
+  }
+  .btn { padding: 6px 10px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8em; font-weight: 600; color: white; }
+  .btn-save { background: #007BFF; }
+  .btn-on   { background: #4CAF50; }
+  .btn-off  { background: #999; }
+  .mode-badge { padding: 4px 9px; border-radius: 12px; font-size: 0.72em; font-weight: 700; color: white; border: none; cursor: pointer; }
+  .mode-badge.auto       { background: #007BFF; }
+  .mode-badge.manual-on  { background: #4CAF50; }
+  .mode-badge.manual-off { background: #777; }
+  .turn-now-btn { width: 100%; padding: 10px; border: none; border-radius: 8px; background: #a3690a; color: white; font-size: 0.95em; cursor: pointer; }
+
+  #syncNote { color: #999; font-size: 0.8em; margin: 4px 0 12px; min-height: 1.2em; text-align: center; }
+  #signOutBtn {
+    background: none; border: 1px solid #ccc; color: #666;
+    padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85em;
+  }
+  #userEmail { color: #999; font-size: 0.8em; margin-bottom: 4px; }
+</style>
+</head>
+<body>
+
+  <div id="loginScreen">
+    <h2>Incubator</h2>
+    <div class="subtitle">Sign in to control your incubator</div>
+    <input type="email" id="emailInput" placeholder="Email" autocomplete="username">
+    <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
+    <button onclick="signIn()">Sign In</button>
+    <div id="loginError"></div>
+  </div>
+
+  <div id="controlScreen">
+    <div id="userEmail"></div>
+    <h2>Incubator Control</h2>
+
+    <div class="group group1">
+      <h3>Temperature and Humidity</h3>
+      <table>
+        <tr><th></th><th>Reading</th><th>Set Value</th><th></th></tr>
+        <tr><td>Temperature</td><td id="tempReadout">--</td>
+          <td><input type="number" id="targetTempInput" step="0.1" min="20" max="45"></td>
+          <td><button class="btn btn-save" onclick="saveTemp()">Save</button></td></tr>
+        <tr><td>Humidity</td><td id="humReadout">--</td>
+          <td><input type="number" id="targetHumInput" step="1" min="20" max="90"></td>
+          <td><button class="btn btn-save" onclick="saveHum()">Save</button></td></tr>
+      </table>
+      <table>
+        <tr><th></th><th>Status</th><th>Manual ON</th><th>Manual OFF</th></tr>
+        <tr><td>Heater</td>
+          <td><button class="mode-badge auto" id="heaterModeBadge" onclick="setMode('Heater','auto')">AUTO</button></td>
+          <td><button class="btn btn-on" onclick="setMode('Heater','on')">ON</button></td>
+          <td><button class="btn btn-off" onclick="setMode('Heater','off')">OFF</button></td></tr>
+        <tr><td>Humidifier</td>
+          <td><button class="mode-badge auto" id="humidModeBadge" onclick="setMode('Humidifier','auto')">AUTO</button></td>
+          <td><button class="btn btn-on" onclick="setMode('Humidifier','on')">ON</button></td>
+          <td><button class="btn btn-off" onclick="setMode('Humidifier','off')">OFF</button></td></tr>
+      </table>
+    </div>
+
+    <div class="group group2">
+      <h3>Fan and Lighting Control</h3>
+      <table>
+        <tr><th></th><th>Status</th><th>Manual ON</th><th>Manual OFF</th></tr>
+        <tr><td>Fan</td>
+          <td><button class="mode-badge auto" id="fanModeBadge" onclick="setMode('Fan','auto')">AUTO</button></td>
+          <td><button class="btn btn-on" onclick="setMode('Fan','on')">ON</button></td>
+          <td><button class="btn btn-off" onclick="setMode('Fan','off')">OFF</button></td></tr>
+        <tr><td>Light</td>
+          <td><span class="badge off" id="lightBadge">OFF</span></td>
+          <td><button class="btn btn-on" onclick="setLight('on')">ON</button></td>
+          <td><button class="btn btn-off" onclick="setLight('off')">OFF</button></td></tr>
+      </table>
+    </div>
+
+    <div class="group group3">
+      <h3>Egg-Turning</h3>
+      <table>
+        <tr><th></th><th>Current</th><th>Set Value</th><th></th></tr>
+        <tr><td>Turn Interval</td><td id="turnCurrent">--</td>
+          <td><input type="number" id="turnIntervalInput" step="5" min="15" max="1440"></td>
+          <td><button class="btn btn-save" onclick="saveTurnInterval()">Save</button></td></tr>
+      </table>
+      <button class="turn-now-btn" onclick="turnEggsNow()">Turn Eggs Now</button>
+    </div>
+
+    <div id="syncNote">Connecting...</div>
+    <button id="signOutBtn" onclick="signOutUser()">Sign out</button>
+  </div>
+
+<script type="module">
+  import { initializeApp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, onSnapshot }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // Same Firebase project as 1.Button_LED. Public web config - safe to expose
+  // client-side. Real access control is enforced server-side by Firestore
+  // Security Rules (restricted to specific UIDs), not by keeping this config secret.
+  const firebaseConfig = {
+    apiKey: "AIzaSyDnk7DM6Cw0P-NBUb9GeMxxaQhE6E6s9GE",
+    authDomain: "automation-home-4b86f.firebaseapp.com",
+    projectId: "automation-home-4b86f",
+    storageBucket: "automation-home-4b86f.firebasestorage.app",
+    messagingSenderId: "145747597471",
+    appId: "1:145747597471:web:08f2f8b32229191a66eaaa"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  // Separate document from "devices/button_led" so both projects can share
+  // this Firebase project without their state colliding.
+  const stateDocRef = doc(db, "devices", "incubator");
+
+  let latestState = {};
+  let unsubscribeSnapshot = null;
+
+  const $ = id => document.getElementById(id);
+
+  window.signIn = async function () {
+    $('loginError').textContent = '';
+    try {
+      await signInWithEmailAndPassword(auth, $('emailInput').value.trim(), $('passwordInput').value);
+    } catch (e) {
+      $('loginError').textContent = 'Sign-in failed: ' + e.message;
+    }
+  };
+
+  window.signOutUser = async function () {
+    await signOut(auth);
+  };
+
+  function setBadge(id, state) {
+    const el = $(id);
+    el.textContent = state ? 'ON' : 'OFF';
+    el.className = 'badge ' + (state ? 'on' : 'off');
+  }
+
+  function setModeBadge(id, on, override) {
+    const el = $(id);
+    if (!override) { el.textContent = 'AUTO'; el.className = 'mode-badge auto'; }
+    else if (on) { el.textContent = 'MANUAL·ON'; el.className = 'mode-badge manual-on'; }
+    else { el.textContent = 'MANUAL·OFF'; el.className = 'mode-badge manual-off'; }
+  }
+
+  function renderState(data) {
+    latestState = data;
+    $('tempReadout').innerHTML = (typeof data.temperature === 'number' ? data.temperature.toFixed(1) : '--') + ' &deg;C';
+    $('humReadout').textContent = (typeof data.humidity === 'number' ? data.humidity.toFixed(0) : '--') + ' %';
+    setModeBadge('heaterModeBadge', !!data.heaterOn, !!data.heaterManualOverride);
+    setModeBadge('humidModeBadge', !!data.humidifierOn, !!data.humidifierManualOverride);
+    setModeBadge('fanModeBadge', !!data.fanOn, !!data.fanManualOverride);
+    setBadge('lightBadge', !!data.lightOn);
+    $('turnCurrent').textContent = (data.turnIntervalMinutes ?? 120) + ' min';
+
+    if (document.activeElement !== $('targetTempInput')) $('targetTempInput').value = data.targetTemp ?? 37.5;
+    if (document.activeElement !== $('targetHumInput')) $('targetHumInput').value = data.targetHumidity ?? 55;
+    if (document.activeElement !== $('turnIntervalInput')) $('turnIntervalInput').value = data.turnIntervalMinutes ?? 120;
+  }
+
+  window.saveTemp = async function () {
+    $('syncNote').textContent = 'Saving...';
+    try {
+      await setDoc(stateDocRef, { targetTemp: parseFloat($('targetTempInput').value) }, { merge: true });
+      $('syncNote').textContent = 'Target temperature saved';
+    } catch (e) {
+      $('syncNote').textContent = 'Save failed: ' + e.message;
+    }
+  };
+
+  window.saveHum = async function () {
+    $('syncNote').textContent = 'Saving...';
+    try {
+      await setDoc(stateDocRef, { targetHumidity: parseFloat($('targetHumInput').value) }, { merge: true });
+      $('syncNote').textContent = 'Target humidity saved';
+    } catch (e) {
+      $('syncNote').textContent = 'Save failed: ' + e.message;
+    }
+  };
+
+  window.saveTurnInterval = async function () {
+    $('syncNote').textContent = 'Saving...';
+    try {
+      await setDoc(stateDocRef, {
+        turnIntervalMinutes: parseInt($('turnIntervalInput').value, 10)
+      }, { merge: true });
+      $('syncNote').textContent = 'Egg-turn interval saved';
+    } catch (e) {
+      $('syncNote').textContent = 'Save failed: ' + e.message;
+    }
+  };
+
+  window.turnEggsNow = async function () {
+    $('syncNote').textContent = 'Requesting egg turn...';
+    try {
+      await setDoc(stateDocRef, { manualTurnRequest: true }, { merge: true });
+      $('syncNote').textContent = 'Turn request sent - device will act within a few seconds';
+    } catch (e) {
+      $('syncNote').textContent = 'Request failed: ' + e.message;
+    }
+  };
+
+  // name: 'Heater' | 'Humidifier' | 'Fan', mode: 'auto' | 'on' | 'off' - mirrors the
+  // ESP32's /setHeaterMode, /setHumidifierMode, /setFanMode endpoints, just written
+  // directly to Firestore instead of over local WiFi.
+  window.setMode = async function (name, mode) {
+    let overrideField, stateField;
+    if (name === 'Heater') { overrideField = 'heaterManualOverride'; stateField = 'heaterManualState'; }
+    else if (name === 'Humidifier') { overrideField = 'humidifierManualOverride'; stateField = 'humidifierManualState'; }
+    else { overrideField = 'fanManualOverride'; stateField = 'fanManualState'; }
+
+    const update = {};
+    if (mode === 'auto') {
+      update[overrideField] = false;
+    } else {
+      update[overrideField] = true;
+      update[stateField] = (mode === 'on');
+    }
+
+    try {
+      await setDoc(stateDocRef, update, { merge: true });
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  window.setLight = async function (state) {
+    try {
+      await setDoc(stateDocRef, { lightOn: state === 'on' }, { merge: true });
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      $('loginScreen').style.display = 'none';
+      $('controlScreen').style.display = 'block';
+      $('userEmail').textContent = 'Signed in as ' + user.email;
+
+      unsubscribeSnapshot = onSnapshot(stateDocRef, (snap) => {
+        if (snap.exists()) {
+          renderState(snap.data());
+          $('syncNote').textContent = 'Synced with ESP32';
+        } else {
+          renderState({});
+          $('syncNote').textContent = 'Waiting for ESP32 to come online...';
+        }
+      }, (err) => {
+        $('syncNote').textContent = 'Sync error: ' + err.message;
+      });
+    } else {
+      if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+      $('controlScreen').style.display = 'none';
+      $('loginScreen').style.display = 'block';
+      $('emailInput').value = '';
+      $('passwordInput').value = '';
+    }
+  });
+</script>
+
+</body>
+</html>
