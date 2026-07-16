@@ -149,13 +149,19 @@
         <tr><th></th><th>Mode</th><th>Progress</th><th></th></tr>
         <tr><td>Cycle</td>
           <td><span class="badge-mode incubator" id="opModeBadge">INCUBATOR</span></td>
-          <td id="cycleProgress">Day --/--</td>
-          <td><button class="btn btn-save" onclick="resetCycle()">Reset</button></td></tr>
+          <td id="cycleProgress">Not Started</td>
+          <td><button class="btn btn-save" id="startCycleBtn" onclick="startCycle()">Start</button></td></tr>
       </table>
       <div class="mode-btn-row">
         <button class="mode-select-btn" id="selectIncubatorBtn" onclick="setOperationMode('incubator')">Incubator Mode</button>
         <button class="mode-select-btn" id="selectHatcherBtn" onclick="setOperationMode('hatcher')">Hatcher Mode</button>
       </div>
+      <div class="egg-type-row" style="margin-top:10px;">
+        <label for="dateTimeInput">Date &amp; Time</label>
+        <input type="datetime-local" id="dateTimeInput">
+        <button class="btn btn-save" onclick="saveDateTime()">Set</button>
+      </div>
+      <div class="hatcher-note" id="clockNote"></div>
     </div>
 
     <div class="group group1">
@@ -293,8 +299,18 @@
     const isHatcher = data.operationMode === 'hatcher';
     $('opModeBadge').textContent = isHatcher ? 'HATCHER' : 'INCUBATOR';
     $('opModeBadge').className = 'badge-mode ' + (isHatcher ? 'hatcher' : 'incubator');
-    $('cycleProgress').textContent = 'Day ' + (data.cycleDay ?? '--') + '/' + (data.cycleDurationDays ?? '--');
+    $('cycleProgress').textContent = data.cycleActive ? ('Day ' + data.cycleDay + '/' + data.cycleDurationDays) : 'Not Started';
+    $('startCycleBtn').textContent = data.cycleActive ? 'Restart' : 'Start';
     $('eggTypeSelect').value = data.eggType ?? 'Chicken';
+
+    if (typeof data.currentEpoch === 'number') {
+      const nowDt = new Date(data.currentEpoch * 1000);
+      const nowDtStr = nowDt.toISOString().slice(0, 16);
+      const dtInput = $('dateTimeInput');
+      if (document.activeElement !== dtInput) dtInput.value = nowDtStr;
+      $('clockNote').textContent = 'Current: ' + nowDtStr.replace('T', ' ') + ' UTC' +
+        (data.clockIsLive ? '' : ' (never set - using fallback)');
+    }
     $('selectIncubatorBtn').className = 'mode-select-btn' + (isHatcher ? '' : ' active');
     $('selectHatcherBtn').className = 'mode-select-btn' + (isHatcher ? ' active' : '');
     $('eggTurningControls').style.display = isHatcher ? 'none' : 'block';
@@ -389,9 +405,9 @@
     }
   };
 
-  // type: 'Chicken' | 'Duck' | 'Goose' | 'Pigeon' | 'Quail' - the PARENT selection;
-  // changing it reloads the current mode's reference values for the new species
-  // and restarts the cycle at Day 1, same as switching Operation Mode does.
+  // type: 'Chicken' | 'Duck' | 'Goose' | 'Pigeon' | 'Quail' - the PARENT selection.
+  // Only previews that species' reference temp/humidity/turn-interval for the
+  // current mode - does NOT start or reset the cycle; Start Cycle does that.
   window.setEggType = async function (type) {
     try {
       await setDoc(stateDocRef, { eggType: type }, { merge: true });
@@ -400,11 +416,30 @@
     }
   };
 
-  window.resetCycle = async function () {
-    $('syncNote').textContent = 'Requesting cycle reset...';
+  // The only action that actually starts (or restarts) a cycle: marks it
+  // active, resets the day-counter to Day 1, and stamps the start date/time
+  // from the device's software clock.
+  window.startCycle = async function () {
+    $('syncNote').textContent = 'Requesting cycle start...';
     try {
-      await setDoc(stateDocRef, { resetCycleRequest: true }, { merge: true });
-      $('syncNote').textContent = 'Reset request sent - device will act within a few seconds';
+      await setDoc(stateDocRef, { startCycleRequest: true }, { merge: true });
+      $('syncNote').textContent = 'Start request sent - device will act within a few seconds';
+    } catch (e) {
+      $('syncNote').textContent = 'Request failed: ' + e.message;
+    }
+  };
+
+  // Sends the datetime-local input's value as a Unix epoch (UTC seconds) - the
+  // 'Z' suffix forces the browser to parse it as UTC rather than local time,
+  // matching the device's own plain-UTC convention throughout.
+  window.saveDateTime = async function () {
+    const v = $('dateTimeInput').value;
+    if (!v) return;
+    const epoch = Math.floor(new Date(v + 'Z').getTime() / 1000);
+    $('syncNote').textContent = 'Setting date/time...';
+    try {
+      await setDoc(stateDocRef, { setDateTimeRequest: epoch }, { merge: true });
+      $('syncNote').textContent = 'Date/time request sent - device will act within a few seconds';
     } catch (e) {
       $('syncNote').textContent = 'Request failed: ' + e.message;
     }
