@@ -1,0 +1,760 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Irrigation Control</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 24px 16px;
+    box-sizing: border-box;
+    background-color: #f0f0f0;
+    color: #222;
+  }
+  h2 { color: #333; margin: 0 0 8px; }
+  .subtitle { color: #777; font-size: 0.9em; margin-bottom: 20px; text-align: center; }
+
+  /* ---------- Login screen ---------- */
+  #loginScreen {
+    background: white;
+    padding: 32px 28px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 320px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  #loginScreen input {
+    width: 100%; padding: 12px; margin: 8px 0;
+    border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 1em;
+  }
+  #loginScreen button {
+    width: 100%; padding: 12px; margin-top: 8px; border: none; border-radius: 6px;
+    background-color: #0d7a5f; color: white; font-size: 1em; cursor: pointer;
+  }
+  #loginScreen button:hover { background-color: #0a6650; }
+  #loginError { color: #d32f2f; font-size: 0.85em; margin-top: 10px; min-height: 1.2em; }
+
+  /* ---------- Control screen ---------- */
+  #controlScreen { display: none; width: 100%; max-width: 580px; box-sizing: border-box; }
+
+  /* ---------- Tabs ----------
+     One page, two boards. The tab bar carries a live status dot per board so a
+     problem on the tab you're NOT looking at is still visible - the whole point
+     of putting them on one page is that they're one system. */
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; }
+  .tab {
+    flex: 1; padding: 12px 10px; border: none; border-radius: 10px;
+    background: #e2e5e8; color: #666; font-size: 0.92em; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab.active { background: #fff; color: #222; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .tab .dot { width: 9px; height: 9px; border-radius: 50%; background: #bbb; flex: none; }
+  .tab .dot.ok { background: #0d7a5f; }
+  .tab .dot.warn { background: #ef6c00; }
+  .tab .dot.bad { background: #c62828; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .group { border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+  .group h3 { margin: 0 0 12px; font-size: 1em; }
+  .group-pump   { background: #eafaf0; } .group-pump h3   { color: #0d7a5f; }
+  .group-sensor { background: #eaf3ff; } .group-sensor h3 { color: #1565c0; }
+  .group-node   { background: #f3e8ff; } .group-node h3   { color: #6a1b9a; }
+  .group-sched  { background: #fff6e3; } .group-sched h3  { color: #a3690a; }
+  .group-zones  { background: #eaf3ff; } .group-zones h3  { color: #1565c0; }
+  .group-cfg    { background: #fff6e3; } .group-cfg h3    { color: #a3690a; }
+
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(0,0,0,0.06); font-size: 0.9em; gap: 10px; }
+  .row:last-child { border-bottom: none; }
+  .row > span:first-child { font-weight: 600; color: #444; }
+
+  .badge { padding: 4px 10px; border-radius: 12px; color: white; font-weight: 700; font-size: 0.72em; }
+  .badge.on { background-color: #0d7a5f; }
+  .badge.off { background-color: #999; }
+  .badge.alm { background-color: #c62828; }
+  .badge.blue { background-color: #1565c0; }
+
+  .mode-badge { padding: 4px 9px; border-radius: 12px; font-size: 0.72em; font-weight: 700; color: white; border: none; cursor: pointer; }
+  .mode-badge.auto { background: #007BFF; }
+  .mode-badge.manual { background: #7c4dff; }
+
+  /* The inhibit banner is the single most important thing on this page:
+     it answers "why isn't it pumping" without needing any other context. */
+  .banner { display: none; padding: 12px 14px; border-radius: 8px; margin-bottom: 16px; font-size: 0.88em; }
+  .banner.inhibit { background: #fdecea; color: #c62828; border-left: 5px solid #c62828; font-weight: 700; }
+  .banner.fault { background: #fff3e0; color: #8a4b00; border-left: 5px solid #ef6c00; }
+  .banner.stale { background: #fff8e1; color: #8a6d00; border-left: 5px solid #f9a825; }
+  .banner.veto { background: #fdecea; color: #c62828; border-left: 5px solid #c62828; font-weight: 700; }
+
+  .zone-pills { display: flex; gap: 6px; flex-wrap: wrap; }
+  .zone-pill { width: 30px; height: 30px; line-height: 30px; text-align: center; border-radius: 50%; font-size: 0.8em; font-weight: 700; background: #ddd; color: #666; }
+  .zone-pill.open { background: #0d7a5f; color: white; }
+
+  .zone { display: flex; align-items: center; justify-content: space-between; gap: 10px; background: white; border-radius: 10px; padding: 12px 14px; margin-bottom: 8px; }
+  .zone:last-child { margin-bottom: 0; }
+  .zone-name { font-weight: 700; color: #333; font-size: 0.95em; }
+  .zone-state { font-size: 0.78em; color: #888; }
+  .zone-state.open { color: #1565c0; font-weight: 700; }
+
+  .btn { padding: 7px 13px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8em; font-weight: 600; color: white; }
+  .btn-primary { background: #0d7a5f; }
+  .btn-blue { background: #1565c0; }
+  .btn-warn { background: #ef6c00; }
+  .btn-danger { background: #c62828; }
+  .btn-grey { background: #888; }
+  .btn:disabled { background: #ccc; cursor: not-allowed; }
+
+  input[type="number"], input[type="datetime-local"], select {
+    padding: 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.85em; box-sizing: border-box;
+  }
+  input[type="number"] { width: 70px; text-align: center; }
+
+  /* ---------- Schedule ---------- */
+  .sched-form { background: rgba(255,255,255,0.6); border-radius: 10px; padding: 12px; margin-bottom: 12px; }
+  .sched-form label { display: block; font-size: 0.75em; font-weight: 600; color: #a3690a; margin: 8px 0 3px; text-transform: uppercase; letter-spacing: .03em; }
+  .sched-form input[type="datetime-local"] { width: 100%; }
+  .zone-checks { display: flex; gap: 10px; flex-wrap: wrap; }
+  .zone-checks label { display: flex; align-items: center; gap: 4px; font-size: 0.85em; font-weight: 600; color: #444; text-transform: none; letter-spacing: 0; margin: 0; }
+
+  .sched-list { list-style: none; padding: 0; margin: 0; }
+  .sched-item { background: white; border-radius: 8px; padding: 10px 12px; margin-bottom: 8px; display: flex; justify-content: space-between; align-items: center; gap: 10px; font-size: 0.85em; }
+  .sched-item.disabled { opacity: 0.5; }
+  .sched-when { font-weight: 700; color: #333; }
+  .sched-meta { color: #777; font-size: 0.9em; }
+  .sched-empty { color: #a3690a; font-size: 0.85em; text-align: center; padding: 10px; }
+
+  .source-note { text-align: center; color: #999; font-size: 0.78em; margin-bottom: 14px; }
+  #syncNote { color: #999; font-size: 0.8em; margin: 4px 0 12px; min-height: 1.2em; text-align: center; }
+  #signOutBtn { background: none; border: 1px solid #ccc; color: #666; padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85em; display: block; margin: 0 auto; }
+  #userEmail { color: #999; font-size: 0.8em; margin-bottom: 4px; text-align: center; }
+  .backlink { display: block; text-align: center; margin-bottom: 18px; color: #0d7a5f; font-size: 0.85em; text-decoration: none; }
+</style>
+</head>
+<body>
+
+  <div id="loginScreen">
+    <h2>Irrigation Control</h2>
+    <div class="subtitle">Sign in to control the pump room and zone valves</div>
+    <input type="email" id="emailInput" placeholder="Email" autocomplete="username">
+    <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
+    <button onclick="signIn()">Sign in</button>
+    <div id="loginError"></div>
+  </div>
+
+  <div id="controlScreen">
+    <h2 style="text-align:center">Irrigation Control</h2>
+    <div class="subtitle">Headend pump room &middot; six-zone field node</div>
+    <a class="backlink" href="index.html">&larr; All automation projects</a>
+    <div id="userEmail"></div>
+
+    <div class="tabs">
+      <button class="tab active" id="tabHeadend" onclick="showTab('headend')"><span class="dot" id="dotHeadend"></span>Headend</button>
+      <button class="tab" id="tabNode" onclick="showTab('node')"><span class="dot" id="dotNode"></span>Zone Node</button>
+    </div>
+
+    <!-- ============ HEADEND PANEL ============ -->
+    <div class="panel active" id="panelHeadend">
+
+      <div class="banner inhibit" id="inhibitBanner"></div>
+      <div class="banner fault" id="faultBanner"></div>
+
+      <div class="group group-pump">
+        <h3>Pumps &amp; pump room</h3>
+        <div class="row"><span>Pump A</span><span><span id="pumpAAlarm"></span> <span class="badge off" id="pumpABadge">OFF</span></span></div>
+        <div class="row"><span>Pump B</span><span><span id="pumpBAlarm"></span> <span class="badge off" id="pumpBBadge">OFF</span></span></div>
+        <div class="row"><span>Duty pump (auto-alternates)</span><span id="dutyPump">&mdash;</span></div>
+        <div class="row">
+          <span>Fertigation</span>
+          <span><span id="fertAlarm"></span>
+            <button class="mode-badge auto" id="fertMode" onclick="cycleOverride('fertigation')">AUTO</button>
+            <span class="badge off" id="fertBadge">OFF</span></span>
+        </div>
+        <div class="row">
+          <span>Filtration</span>
+          <span><span id="filtAlarm"></span>
+            <button class="mode-badge auto" id="filtMode" onclick="cycleOverride('filtration')">AUTO</button>
+            <span class="badge off" id="filtBadge">OFF</span></span>
+        </div>
+        <div class="row">
+          <span>Exhaust fan</span>
+          <span><span id="fanAlarm"></span>
+            <button class="mode-badge auto" id="fanMode" onclick="cycleOverride('exhaustFan')">AUTO</button>
+            <span class="badge off" id="fanBadge">OFF</span></span>
+        </div>
+        <div class="row">
+          <span>Manual pump request</span>
+          <span><button class="btn btn-grey" id="manualPumpBtn" onclick="toggleManualPump()">Request</button></span>
+        </div>
+      </div>
+
+      <div class="group group-sensor">
+        <h3>Pump room sensors</h3>
+        <div class="row"><span>Line pressure</span><span id="pressureVal">&mdash;</span></div>
+        <div class="row"><span>Water level</span><span id="levelVal">&mdash;</span></div>
+        <div class="row"><span>Rain</span><span id="rainVal">&mdash;</span></div>
+        <div class="row">
+          <span>Pressure trip point</span>
+          <span><input type="number" id="pressureTripInput" step="0.1" min="1" max="20"> bar</span>
+        </div>
+        <div class="row">
+          <span>Minimum water level</span>
+          <span><input type="number" id="levelMinInput" step="1" min="0" max="100"> %
+            <button class="btn btn-primary" onclick="saveThresholds()">Save</button></span>
+        </div>
+      </div>
+
+      <div class="group group-node">
+        <h3>Zone status &amp; run now</h3>
+        <div class="row"><span>LoRa link to node</span><span class="badge off" id="nodeLinkBadge">&mdash;</span></div>
+        <div class="row"><span>Open zone valves</span><span class="zone-pills" id="zonePills"></span></div>
+        <div class="row"><span>Job</span><span id="jobVal">idle</span></div>
+        <div class="row">
+          <span>Run now</span>
+          <span>
+            <select id="runNowZone">
+              <option value="1">Zone 1</option><option value="2">Zone 2</option><option value="3">Zone 3</option>
+              <option value="4">Zone 4</option><option value="5">Zone 5</option><option value="6">Zone 6</option>
+            </select>
+            <input type="number" id="runNowMin" value="15" min="1" max="240"> min
+            <button class="btn btn-primary" onclick="runNow()">Start</button>
+            <button class="btn btn-danger" onclick="stopJob()">Stop</button>
+          </span>
+        </div>
+      </div>
+
+      <div class="group group-sched">
+        <h3>Irrigation calendar</h3>
+        <div class="sched-form">
+          <label for="schedStart">Start date &amp; time</label>
+          <input type="datetime-local" id="schedStart">
+          <label>Zones (run one after another, not together)</label>
+          <div class="zone-checks">
+            <label><input type="checkbox" class="schedZone" value="1"> 1</label>
+            <label><input type="checkbox" class="schedZone" value="2"> 2</label>
+            <label><input type="checkbox" class="schedZone" value="3"> 3</label>
+            <label><input type="checkbox" class="schedZone" value="4"> 4</label>
+            <label><input type="checkbox" class="schedZone" value="5"> 5</label>
+            <label><input type="checkbox" class="schedZone" value="6"> 6</label>
+          </div>
+          <label for="schedDur">Minutes per zone</label>
+          <input type="number" id="schedDur" value="15" min="1" max="240">
+          <label for="schedRepeat">Repeat</label>
+          <select id="schedRepeat">
+            <option value="0">Once, on this date only</option>
+            <option value="1">Every day</option>
+            <option value="2">Every 2 days</option>
+            <option value="3">Every 3 days</option>
+            <option value="7" selected>Every week</option>
+            <option value="14">Every 2 weeks</option>
+          </select>
+          <div style="margin-top:12px"><button class="btn btn-primary" onclick="addScheduleEntry()">Add to calendar</button></div>
+        </div>
+        <ul class="sched-list" id="schedList"></ul>
+      </div>
+    </div>
+
+    <!-- ============ NODE PANEL ============ -->
+    <div class="panel" id="panelNode">
+
+      <div class="banner veto" id="vetoBanner"></div>
+      <div class="banner stale" id="staleBanner"></div>
+      <div class="source-note" id="sourceNote"></div>
+
+      <div class="group group-zones">
+        <h3>Zone valves</h3>
+        <div id="zoneList"></div>
+        <div style="margin-top:12px; text-align:center">
+          <button class="btn btn-danger" onclick="closeAll()">Close all valves</button>
+        </div>
+      </div>
+
+      <div class="group group-sensor">
+        <h3>Field sensors</h3>
+        <div class="row"><span>Soil moisture</span><span id="soilVal">&mdash;</span></div>
+        <div class="row"><span>Rain</span><span id="nodeRainVal">&mdash;</span></div>
+        <div class="row"><span>Headend LoRa link</span><span class="badge off" id="headLinkBadge">&mdash;</span></div>
+      </div>
+
+      <div class="group group-cfg">
+        <h3>Thresholds</h3>
+        <div class="row">
+          <span>Soil counts as wet above</span>
+          <span><input type="number" id="soilWetInput" step="1" min="0" max="100"> %</span>
+        </div>
+        <div class="row">
+          <span>Manual run length</span>
+          <span><input type="number" id="runMinInput" value="15" min="1" max="240"> min</span>
+        </div>
+        <div class="row">
+          <span></span>
+          <span><button class="btn btn-blue" onclick="saveNodeThresholds()">Save thresholds</button></span>
+        </div>
+      </div>
+    </div>
+
+    <div id="syncNote">Connecting...</div>
+    <button id="signOutBtn" onclick="signOutUser()">Sign out</button>
+  </div>
+
+<script type="module">
+  import { initializeApp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, onSnapshot }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // Same Firebase project as the other automation devices. Public web config -
+  // safe to expose client-side; real access control is enforced server-side by
+  // Firestore Security Rules restricted to specific UIDs.
+  const firebaseConfig = {
+    apiKey: "AIzaSyDnk7DM6Cw0P-NBUb9GeMxxaQhE6E6s9GE",
+    authDomain: "automation-home-4b86f.firebaseapp.com",
+    projectId: "automation-home-4b86f",
+    storageBucket: "automation-home-4b86f.firebasestorage.app",
+    messagingSenderId: "145747597471",
+    appId: "1:145747597471:web:08f2f8b32229191a66eaaa"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  // Two boards, two documents, one page. Both listeners run regardless of
+  // which tab is showing, so the tab dots stay truthful and switching tabs is
+  // instant rather than triggering a fresh fetch.
+  const headDocRef = doc(db, "devices", "irrigation_headend");
+  const nodeDocRef = doc(db, "devices", "irrigation_node1");
+
+  const ZONE_COUNT = 6;
+  // How long the node's own document stays trustworthy. It pushes every ~5s
+  // when it has WiFi, so a minute of silence means it has dropped off and the
+  // headend's LoRa mirror is the better source.
+  const NODE_FRESH_MS = 60000;
+
+  let headState = null;
+  let nodeState = null;
+  let nodeUpdatedAt = 0;
+  let schedule = [];
+  let unsubHead = null, unsubNode = null;
+
+  const $ = id => document.getElementById(id);
+
+  window.signIn = async function () {
+    $('loginError').textContent = '';
+    try {
+      await signInWithEmailAndPassword(auth, $('emailInput').value.trim(), $('passwordInput').value);
+    } catch (e) {
+      $('loginError').textContent = 'Sign-in failed: ' + e.message;
+    }
+  };
+
+  window.signOutUser = async function () { await signOut(auth); };
+
+  window.showTab = function (which) {
+    const isHead = (which === 'headend');
+    $('tabHeadend').className = 'tab' + (isHead ? ' active' : '');
+    $('tabNode').className = 'tab' + (isHead ? '' : ' active');
+    $('panelHeadend').className = 'panel' + (isHead ? ' active' : '');
+    $('panelNode').className = 'panel' + (isHead ? '' : ' active');
+  };
+
+  function setBadge(id, state, label) {
+    const el = $(id);
+    el.textContent = label || (state ? 'ON' : 'OFF');
+    el.className = 'badge ' + (state ? 'on' : 'off');
+  }
+
+  function setAlarm(id, active) {
+    const el = $(id);
+    el.textContent = active ? 'ALARM' : '';
+    el.className = active ? 'badge alm' : '';
+  }
+
+  function setOverrideBadge(id, override, state) {
+    const el = $(id);
+    if (!override) { el.textContent = 'AUTO'; el.className = 'mode-badge auto'; }
+    else { el.textContent = state ? 'MAN-ON' : 'MAN-OFF'; el.className = 'mode-badge manual'; }
+  }
+
+  function showBanner(id, text, html) {
+    const el = $(id);
+    el.style.display = text ? 'block' : 'none';
+    if (html) el.innerHTML = text; else el.textContent = text;
+  }
+
+  // The devices store every epoch as UTC; only this page renders in the
+  // viewer's local timezone. Keep that split - mixing the two is how schedules
+  // end up an hour off after a DST change.
+  function epochToLocalInput(epoch) {
+    const d = new Date(epoch * 1000);
+    const pad = n => String(n).padStart(2, '0');
+    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
+           'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+  }
+
+  function epochToLocalText(epoch) {
+    return new Date(epoch * 1000).toLocaleString(undefined, {
+      weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function zoneMaskToText(mask) {
+    const zones = [];
+    for (let i = 0; i < ZONE_COUNT; i++) if (mask & (1 << i)) zones.push(i + 1);
+    return zones.length ? 'Zone ' + zones.join(', ') : 'No zones';
+  }
+
+  function repeatToText(days) {
+    if (!days) return 'once';
+    if (days === 1) return 'daily';
+    if (days === 7) return 'weekly';
+    if (days === 14) return 'fortnightly';
+    return 'every ' + days + ' days';
+  }
+
+  function nodeIsFresh() {
+    return nodeState !== null && (Date.now() - nodeUpdatedAt) < NODE_FRESH_MS;
+  }
+
+  // Builds one view of the node from whichever source is currently better, so
+  // the rendering code never has to care where a value came from.
+  function resolvedNode() {
+    if (nodeIsFresh()) {
+      return {
+        source: 'node',
+        valves: nodeState.valves || '000000',
+        remaining: (nodeState.valveMinutesRemaining || '').split(','),
+        soil: nodeState.soilMoisturePercent,
+        rain: !!nodeState.rainDetected,
+        headLink: !!nodeState.headLinkAlive,
+        veto: nodeState.lastVetoReason || '',
+        soilWet: nodeState.soilWetThreshold
+      };
+    }
+    if (headState) {
+      return {
+        source: 'mirror',
+        valves: headState.nodeValves || '000000',
+        remaining: [],
+        soil: headState.nodeSoilMoisture,
+        rain: !!headState.nodeRainDetected,
+        headLink: !!headState.nodeLinkAlive,
+        veto: '',
+        soilWet: nodeState ? nodeState.soilWetThreshold : undefined
+      };
+    }
+    return null;
+  }
+
+  function renderSchedule() {
+    const list = $('schedList');
+    list.innerHTML = '';
+    if (!schedule.length) {
+      list.innerHTML = '<div class="sched-empty">No scheduled irrigation yet.</div>';
+      return;
+    }
+    schedule.forEach((e, i) => {
+      const li = document.createElement('li');
+      li.className = 'sched-item' + (e.on ? '' : ' disabled');
+      li.innerHTML =
+        '<div><div class="sched-when">' + epochToLocalText(e.start) + '</div>' +
+        '<div class="sched-meta">' + zoneMaskToText(e.zones) + ' &middot; ' + e.dur + ' min each &middot; ' + repeatToText(e.repeat) + '</div></div>' +
+        '<div><button class="btn btn-grey" data-toggle="' + i + '">' + (e.on ? 'Disable' : 'Enable') + '</button> ' +
+        '<button class="btn btn-danger" data-del="' + i + '">Delete</button></div>';
+      list.appendChild(li);
+    });
+    list.querySelectorAll('[data-toggle]').forEach(b =>
+      b.onclick = () => { const i = +b.dataset.toggle; schedule[i].on = !schedule[i].on; saveSchedule(); });
+    list.querySelectorAll('[data-del]').forEach(b =>
+      b.onclick = () => { schedule.splice(+b.dataset.del, 1); saveSchedule(); });
+  }
+
+  function renderHeadend() {
+    const data = headState;
+    if (!data) return;
+
+    setBadge('pumpABadge', !!data.pumpARunning, data.pumpARunning ? 'RUNNING' : 'OFF');
+    setBadge('pumpBBadge', !!data.pumpBRunning, data.pumpBRunning ? 'RUNNING' : 'OFF');
+    $('dutyPump').textContent = data.dutyPumpIsA === false ? 'Pump B' : 'Pump A';
+    setAlarm('pumpAAlarm', !!data.almPumpA);
+    setAlarm('pumpBAlarm', !!data.almPumpB);
+    setAlarm('fertAlarm', !!data.almFertigation);
+    setAlarm('filtAlarm', !!data.almFiltration);
+    setAlarm('fanAlarm', !!data.almExhaustFan);
+
+    setBadge('fertBadge', !!data.fertigationOn);
+    setBadge('filtBadge', !!data.filtrationOn);
+    setBadge('fanBadge', !!data.exhaustFanOn);
+    setOverrideBadge('fertMode', !!data.fertigationManualOverride, !!data.fertigationManualState);
+    setOverrideBadge('filtMode', !!data.filtrationManualOverride, !!data.filtrationManualState);
+    setOverrideBadge('fanMode', !!data.exhaustFanManualOverride, !!data.exhaustFanManualState);
+
+    const mp = !!data.manualPumpRequest;
+    $('manualPumpBtn').textContent = mp ? 'Requested - cancel' : 'Request';
+    $('manualPumpBtn').className = 'btn ' + (mp ? 'btn-warn' : 'btn-grey');
+
+    // A missing pressure value means the 4-20mA loop is open (broken wire or
+    // unpowered transducer) - deliberately NOT rendered as 0 bar, which would
+    // read as a healthy low-pressure system.
+    $('pressureVal').textContent = (typeof data.linePressureBar === 'number')
+      ? data.linePressureBar.toFixed(2) + ' bar' : 'SENSOR FAULT (4-20mA loop open)';
+    $('levelVal').textContent = (typeof data.waterLevelPercent === 'number')
+      ? data.waterLevelPercent.toFixed(0) + ' %' : '--';
+    $('rainVal').textContent = data.rainDetected ? 'Detected' : 'Clear';
+
+    if (document.activeElement !== $('pressureTripInput')) $('pressureTripInput').value = data.pressureTripBar ?? 6;
+    if (document.activeElement !== $('levelMinInput')) $('levelMinInput').value = data.levelMinPercent ?? 15;
+
+    const linkAlive = !!data.nodeLinkAlive;
+    setBadge('nodeLinkBadge', linkAlive, linkAlive ? 'ALIVE' : 'LOST');
+
+    const valves = data.nodeValves || '000000';
+    const pills = $('zonePills');
+    pills.innerHTML = '';
+    for (let i = 0; i < ZONE_COUNT; i++) {
+      const d = document.createElement('div');
+      d.className = 'zone-pill' + (valves[i] === '1' ? ' open' : '');
+      d.textContent = i + 1;
+      pills.appendChild(d);
+    }
+
+    $('jobVal').textContent = (data.jobState || 'idle') +
+      (data.jobCurrentZone > 0 ? ' (zone ' + data.jobCurrentZone + ')' : '');
+
+    const inhibit = data.inhibitReason || '';
+    showBanner('inhibitBanner', inhibit ? 'Pump held off: ' + inhibit : '');
+
+    const fault = !!data.pressureFaultLatched;
+    showBanner('faultBanner', fault
+      ? 'Overpressure fault is latched. Check for a closed valve or blocked filter before resetting. ' +
+        '<button class="btn btn-warn" onclick="resetFault()">Reset fault</button>' : '', true);
+
+    if (typeof data.schedule === 'string' && data.schedule.length) {
+      try { schedule = JSON.parse(data.schedule); } catch (e) { schedule = []; }
+    } else {
+      schedule = [];
+    }
+    renderSchedule();
+  }
+
+  function renderNode() {
+    const s = resolvedNode();
+    if (!s) return;
+
+    const list = $('zoneList');
+    list.innerHTML = '';
+    for (let i = 0; i < ZONE_COUNT; i++) {
+      const open = s.valves[i] === '1';
+      const remain = s.remaining[i] ? parseInt(s.remaining[i]) : 0;
+      const div = document.createElement('div');
+      div.className = 'zone';
+      div.innerHTML =
+        '<div><div class="zone-name">Zone ' + (i + 1) + '</div>' +
+        '<div class="zone-state' + (open ? ' open' : '') + '">' +
+        (open ? ('OPEN' + (remain > 0 ? ' &middot; closes in ' + remain + ' min' : '')) : 'Closed') +
+        '</div></div>' +
+        '<button class="btn ' + (open ? 'btn-grey' : 'btn-blue') + '" data-zone="' + (i + 1) + '" data-open="' + (open ? '0' : '1') + '">' +
+        (open ? 'Close' : 'Open') + '</button>';
+      list.appendChild(div);
+    }
+
+    $('soilVal').textContent = (typeof s.soil === 'number') ? s.soil.toFixed(0) + ' %' : '--';
+    $('nodeRainVal').textContent = s.rain ? 'Detected' : 'Clear';
+    const el = $('headLinkBadge');
+    el.textContent = s.headLink ? 'ALIVE' : 'LOST';
+    el.className = 'badge ' + (s.headLink ? 'on' : 'alm');
+
+    if (typeof s.soilWet === 'number' && document.activeElement !== $('soilWetInput')) {
+      $('soilWetInput').value = s.soilWet;
+    }
+
+    showBanner('vetoBanner', s.veto);
+
+    // Direct control needs the node itself online. Via the mirror we can show
+    // state but not command it, so say so rather than offering buttons that
+    // would silently do nothing for minutes.
+    const viaMirror = (s.source === 'mirror');
+    showBanner('staleBanner', viaMirror
+      ? 'The node is not reachable over WiFi right now. State shown here is mirrored from the headend over LoRa, and valve commands from this tab will not reach the node until its WiFi returns. Use Run now on the Headend tab, or the buttons on the node itself.'
+      : '');
+    $('sourceNote').textContent = viaMirror ? 'Source: headend LoRa mirror' : 'Source: node, live over WiFi';
+
+    list.querySelectorAll('[data-zone]').forEach(b => {
+      b.disabled = viaMirror;
+      b.onclick = () => setValve(parseInt(b.dataset.zone), b.dataset.open === '1');
+    });
+  }
+
+  function renderTabDots() {
+    // Headend dot: red on a latched fault, amber if the pump is inhibited for
+    // any other reason, green otherwise.
+    const hd = $('dotHeadend');
+    if (!headState) hd.className = 'dot';
+    else if (headState.pressureFaultLatched) hd.className = 'dot bad';
+    else if (headState.inhibitReason) hd.className = 'dot warn';
+    else hd.className = 'dot ok';
+
+    // Node dot: red if the headend has lost the LoRa link (the condition that
+    // stops irrigation entirely), amber when we're reading via the mirror.
+    const nd = $('dotNode');
+    const s = resolvedNode();
+    if (!s) nd.className = 'dot';
+    else if (!s.headLink) nd.className = 'dot bad';
+    else if (s.source === 'mirror') nd.className = 'dot warn';
+    else nd.className = 'dot ok';
+  }
+
+  function render() {
+    if (!headState && !nodeState) {
+      $('syncNote').textContent = 'Waiting for the headend or node to report in...';
+      return;
+    }
+    renderHeadend();
+    renderNode();
+    renderTabDots();
+
+    if (headState && headState.clockIsLive === false) {
+      $('syncNote').textContent = 'Headend clock has never been set - the calendar will not run until it is.';
+    } else {
+      $('syncNote').textContent = 'Live';
+    }
+  }
+
+  async function patch(ref, fields, note) {
+    $('syncNote').textContent = 'Saving...';
+    try {
+      await setDoc(ref, fields, { merge: true });
+      $('syncNote').textContent = note || 'Saved';
+    } catch (e) {
+      $('syncNote').textContent = 'Save failed: ' + e.message;
+    }
+  }
+
+  function saveSchedule() {
+    renderSchedule();
+    patch(headDocRef, { schedule: JSON.stringify(schedule) }, 'Calendar saved');
+  }
+
+  window.addScheduleEntry = function () {
+    const startVal = $('schedStart').value;
+    if (!startVal) { $('syncNote').textContent = 'Pick a start date and time first'; return; }
+
+    let mask = 0;
+    document.querySelectorAll('.schedZone:checked').forEach(c => mask |= (1 << (parseInt(c.value) - 1)));
+    if (!mask) { $('syncNote').textContent = 'Select at least one zone'; return; }
+
+    // No 'Z' suffix: a datetime-local string with no timezone designator is
+    // parsed as LOCAL time, which is what the picker showed the user.
+    schedule.push({
+      start: Math.floor(new Date(startVal).getTime() / 1000),
+      zones: mask,
+      dur: parseInt($('schedDur').value) || 15,
+      repeat: parseInt($('schedRepeat').value) || 0,
+      on: true,
+      fired: false
+    });
+    schedule.sort((a, b) => a.start - b.start);
+    saveSchedule();
+    document.querySelectorAll('.schedZone').forEach(c => c.checked = false);
+  };
+
+  window.cycleOverride = function (which) {
+    // AUTO -> MANUAL-ON -> MANUAL-OFF -> AUTO, matching the keypad menu's own
+    // three-state cycle on the device.
+    const ovKey = which + 'ManualOverride';
+    const stKey = which + 'ManualState';
+    const ov = !!(headState && headState[ovKey]);
+    const st = !!(headState && headState[stKey]);
+    let next;
+    if (!ov) next = { [ovKey]: true, [stKey]: true };
+    else if (st) next = { [ovKey]: true, [stKey]: false };
+    else next = { [ovKey]: false, [stKey]: false };
+    patch(headDocRef, next);
+  };
+
+  window.toggleManualPump = function () {
+    patch(headDocRef, { manualPumpRequest: !(headState && headState.manualPumpRequest) });
+  };
+
+  window.resetFault = function () { patch(headDocRef, { resetFaultRequest: true }, 'Fault reset requested'); };
+  window.stopJob = function () { patch(headDocRef, { stopJobRequest: true }, 'Stop requested'); };
+
+  window.runNow = function () {
+    const zone = parseInt($('runNowZone').value);
+    const mins = Math.min(parseInt($('runNowMin').value) || 15, 240);
+    // Encoded as zoneMask * 1000 + minutes so one integer field carries the
+    // whole request - the device decodes it the same way.
+    patch(headDocRef, { startJobRequest: (1 << (zone - 1)) * 1000 + mins }, 'Run requested');
+  };
+
+  window.saveThresholds = function () {
+    patch(headDocRef, {
+      pressureTripBar: parseFloat($('pressureTripInput').value),
+      levelMinPercent: parseFloat($('levelMinInput').value)
+    }, 'Thresholds saved');
+  };
+
+  function setValve(zone, open) {
+    const mins = open ? Math.min(parseInt($('runMinInput').value) || 15, 240) : 0;
+    // Encoded as zone * 10000 + minutes (0 minutes = close) so one integer
+    // field carries the whole request - the device decodes it the same way.
+    patch(nodeDocRef, { valveRequest: zone * 10000 + mins },
+          open ? ('Zone ' + zone + ' open requested') : ('Zone ' + zone + ' close requested'));
+  }
+
+  window.closeAll = function () { patch(nodeDocRef, { closeAllRequest: true }, 'Close-all requested'); };
+
+  window.saveNodeThresholds = function () {
+    patch(nodeDocRef, { soilWetThreshold: parseFloat($('soilWetInput').value) }, 'Thresholds saved');
+  };
+
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      $('loginScreen').style.display = 'none';
+      $('controlScreen').style.display = 'block';
+      $('userEmail').textContent = user.email;
+      if (!$('schedStart').value) $('schedStart').value = epochToLocalInput(Math.floor(Date.now() / 1000));
+
+      unsubHead = onSnapshot(headDocRef, (snap) => {
+        if (snap.exists()) headState = snap.data();
+        render();
+      }, (err) => { $('syncNote').textContent = 'Headend sync error: ' + err.message; });
+
+      unsubNode = onSnapshot(nodeDocRef, (snap) => {
+        if (snap.exists()) {
+          nodeState = snap.data();
+          // Firestore gives no server-side write timestamp on these documents,
+          // so freshness is measured from when this client last saw a change.
+          // Good enough to tell "updating every few seconds" from "silent for
+          // minutes", which is the only distinction that matters here.
+          nodeUpdatedAt = Date.now();
+        }
+        render();
+      }, (err) => { $('syncNote').textContent = 'Node sync error: ' + err.message; });
+
+      // Node freshness decays with wall-clock time, not with incoming
+      // snapshots - without this tick the page would keep claiming the node is
+      // live long after it went quiet, since nothing would trigger a re-render.
+      setInterval(render, 10000);
+    } else {
+      if (unsubHead) { unsubHead(); unsubHead = null; }
+      if (unsubNode) { unsubNode(); unsubNode = null; }
+      $('loginScreen').style.display = 'block';
+      $('controlScreen').style.display = 'none';
+    }
+  });
+</script>
+</body>
+</html>
