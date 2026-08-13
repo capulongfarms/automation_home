@@ -10,37 +10,55 @@ Live site: https://capulongfarms.github.io/automation_home/
 
 ## Architecture
 
-- **`index.html` is now a dashboard/landing page, not a device page** (changed 2026-07-13) — pure navigation (two cards linking out), no Firebase calls of its own. Local source: `Home/index.html` in the workspace. Each actual device still gets its own self-contained page (HTML/CSS/JS, no shared includes), deployed via GitHub Pages directly from `main` / root on every push:
+- **`index.html` is a dashboard/landing page, not a device page** (changed 2026-07-13) — pure navigation (three cards linking out), no Firebase calls of its own. Local source: `Home/index.html` in the workspace. Each page is self-contained (own HTML/CSS/JS, no shared includes), deployed via GitHub Pages directly from `main` / root on every push:
   - `index.html` — **Dashboard** (links to the pages below)
   - `button.html` — Button_LED
   - `incubator.html` — Incubator
+  - `irrigation.html` — Irrigation Headend **and** Zone Node, tabbed (see below)
 - **Firebase Authentication** (email/password) gates access on each device page — only signed-in users can read or write device state. The dashboard itself has no auth gate since it shows no device data.
 - **Cloud Firestore** (project `automation-home-4b86f`) holds live device state, one document per device under the `devices` collection (e.g. `devices/button_led`).
 - Real-time sync on the web side via Firestore's `onSnapshot` listener — no polling.
-- ESP32 firmware source is **not** in this repo — it lives locally at (Capulong Farms workspace, tracked in a separate repo):
-  - `ESP32 Softwares/3. Code and Libraries/Code/1.Button_LED/1.Button_LED.ino`
-  - `ESP32 Softwares/3. Code and Libraries/Code/12.Incubator/12.Incubator.ino`
-  - The workspace also has a `ESP32 Softwares/3. Code and Libraries/Code/Home/` folder — no firmware, just the dashboard's local source, a multi-root `.code-workspace`, and a `README.md` describing this whole deployment strategy (including how to add a new project's page).
+- ESP32 firmware source is **not** in this repo — it lives in the Capulong Farms workspace (a separate, private repo), under `Project Details/4.Automation/0Master/Codes/`:
+  - `1.Button_LED/1.Button_LED.ino`
+  - `12.Incubator/12.Incubator.ino`
+  - `13.Headend/13.Headend.ino`
+  - `14.Nodes/14.Nodes.ino`
+  - That folder also has a `Home/` subfolder — no firmware, just the dashboard's local source, `architecture-diagram.html`, a multi-root `.code-workspace`, and a `README.md` describing this whole deployment strategy (including how to add a new project's page).
 
 ## Devices
+
+Four boards, three pages — Irrigation is two boards on one page.
 
 | Firestore document | Device | Page | Description |
 |---|---|---|---|
 | `devices/button_led` | ESP32 Button_LED | `button.html` | Home LED toggle via physical button (GPIO 25), local web page (AP fallback), or this remote app |
-| `devices/incubator` | ESP32 Incubator | `incubator.html` | Egg incubator: heater/humidifier (auto + manual override), fan, light, servo egg-turner. Also has a fully standalone local LCD+IR-remote menu, no WiFi required — this remote page is a convenience, not a dependency. |
+| `devices/incubator` | ESP32 Incubator | `incubator.html` | Egg incubator: heater/humidifier (auto + manual override), fan, light, egg-turner. Also has a fully standalone local OLED + keypad menu, no WiFi required — this remote page is a convenience, not a dependency. |
+| `devices/irrigation_headend` | ESP32 Irrigation Headend | `irrigation.html` (Headend tab) | Pump room: duty/standby pumps (auto-alternating), fertigation, filtration, exhaust fan, water level + pressure + rain sensors, and the irrigation calendar |
+| `devices/irrigation_node1` | ESP32 Irrigation Zone Node | `irrigation.html` (Zone Node tab) | Six zone control valves, shared soil-moisture probe, rain sensor, one manual button per valve. Field-mounted — usually **out of WiFi range**. |
+
+### Irrigation is the one page that breaks the usual patterns
+
+Three deliberate exceptions, all worth knowing before editing `irrigation.html`:
+
+1. **Two boards, one page.** They are one irrigation system that happens to be split across two ESP32s, so they share one login and get a tab each, with a live status dot per tab so a fault on the tab you are *not* looking at stays visible.
+2. **It watches two documents.** The Zone Node tab reads `devices/irrigation_node1` when fresh, and falls back to the Headend's mirror of that state (`nodeValves`, `nodeSoilMoisture`, `nodeLinkAlive` inside `devices/irrigation_headend`) when the node has been silent for over a minute — the expected normal state. In mirror mode the tab is read-only and says so, because valve commands still need the node's own WiFi.
+3. **The safety interlock does not run through Firebase at all.** The pump/valve interlock runs board-to-board over LoRa. Nothing on this page is load-bearing for safety, and nothing added here should become so — a control path that depends on the internet cannot be a safety path.
+
+Its local source is `13.Headend/index.html` in the workspace. `14.Nodes/` deliberately has **no** web page — one deployed page, one source file.
 
 ## Firebase Project
 
 - Project ID: `automation-home-4b86f`
-- Two Auth accounts by design, both referenced in Firestore Security Rules:
-  - Personal login — used by this web app
-  - One dedicated **device account per ESP32** (e.g. `device@automation-home.local`), used by the Firebase-ESP-Client Arduino library on the device side — kept separate from the personal login so either credential can be rotated independently without affecting the other
-- Security Rules restrict all reads/writes to exactly those UIDs — managed in Firebase Console → Firestore Database → Rules (not tracked in this repo).
-- **Known divergence from the "one Auth account per device" guidance below**: Incubator currently reuses Button_LED's exact device account (`device@automation-home.local`) rather than getting its own. This was a deliberate simplification made when Incubator was first built (to avoid provisioning new Firebase/GitHub details), not an oversight. Both devices are distinguished purely by Firestore document path (`devices/button_led` vs `devices/incubator`), not by credential. Revisit if either device ever needs independently-rotatable device credentials.
+- **One shared device account for every ESP32** (`device@automation-home.local`), plus a personal login used by this web app. Devices are separated by **Firestore document path only**, not by credential.
+- Security Rules restrict all reads/writes to those UIDs — managed in Firebase Console → Firestore Database → Rules (not tracked in this repo).
+
+**This is a settled decision, confirmed 2026-08-13 — do not propose changing it.** An earlier version of this file recommended one dedicated Auth account per device and called reuse a "known divergence." That guidance has been retired. The owner was shown the trade-off explicitly — any one device's credentials can read and write every other device's document, which matters more now that the irrigation Node lives outside a locked building — and chose to keep the shared account, because document-level separation gives the state isolation actually wanted. Revisit only if the owner raises it, or if a device is lost or stolen.
 
 ## Key Gotchas
 
-- **The `firebaseConfig` values in `index.html` are not secret.** `apiKey`, `projectId`, etc. are meant to be public; real access control is enforced server-side by Firestore Security Rules, not by hiding this config.
+- **The `firebaseConfig` values in the pages are not secret.** `apiKey`, `projectId`, etc. are meant to be public; real access control is enforced server-side by Firestore Security Rules, not by hiding this config.
 - **A client-side password prompt is not a security boundary.** The whole page downloads before any JS check runs, so it can be read or bypassed. Auth must go through Firebase Authentication + Security Rules, not app-level checks.
-- **The ESP32 side has no real-time listener.** Firestore access via the Firebase-ESP-Client Arduino library is REST-based, so the device polls every ~3 seconds rather than subscribing to a stream. The web app, by contrast, updates instantly via `onSnapshot`.
-- **Adding a new device:** create a new document under `devices/`, give the new ESP32 its own dedicated Firebase Auth account (never reuse another device's credentials), add its UID to the Firestore Security Rules, deploy its page here under its own name (e.g. `newdevice.html`), and add a card for it to `index.html` (the dashboard) — full checklist in the workspace's `Home/README.md`.
+- **The ESP32 side has no real-time listener.** Firestore access via the Firebase-ESP-Client Arduino library is REST-based, so devices poll every ~3 seconds rather than subscribing to a stream. The web app, by contrast, updates instantly via `onSnapshot`.
+- **Page filenames are lowercase, and GitHub Pages is case-sensitive.** A mixed-case name has already caused a 404 on a hand-typed URL once (`Button.html` → `button.html`, 2026-07-13). The local Windows filesystem will not catch this for you.
+- **Every page here is a deployed *copy*.** The editable source lives in the workspace repo under each project's folder as `index.html`; deploying means copying it in under its deployed name and pushing here. Editing a page in this repo directly means the next deploy silently overwrites it.
+- **Adding a new device:** create a new document under `devices/`, reuse the existing `device@automation-home.local` account and the same `API_KEY`/`FIREBASE_PROJECT_ID` constants (see the Firebase Project section above — do not provision a new account), deploy its page here under its own lowercase name (e.g. `newdevice.html`), and add a card for it to `index.html` (the dashboard) — full checklist in the workspace's `Home/README.md`.
