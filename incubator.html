@@ -188,6 +188,13 @@
 
     <div class="group group1">
       <h3>Temperature and Humidity</h3>
+      <!-- Shown only when the device reports dhtOk == false. The readings above
+           are then the last values Firestore received, NOT live ones — and the
+           same failed read has already forced the heater and humidifier off. -->
+      <div id="sensorFaultMsg" style="display:none; background:#fdecea; color:#c62828; border-left:5px solid #c62828; padding:10px 12px; border-radius:6px; margin-bottom:10px; font-size:0.85em; font-weight:600">
+        SENSOR FAULT — DHT11 not reading.<br>
+        <span style="font-weight:400">Values below are the last known reading, not live. Heater and humidifier are forced OFF by the safety fail-safe until the sensor recovers.</span>
+      </div>
       <table>
         <tr><th></th><th>Reading</th><th>Set Value</th><th></th></tr>
         <tr><td>Temperature</td><td id="tempReadout">--</td>
@@ -356,8 +363,18 @@
 
   function renderState(data) {
     latestState = data;
+    // A failed DHT read cannot be pushed (NaN is invalid JSON), so the device
+    // omits temperature/humidity and Firestore keeps serving the LAST GOOD
+    // values. Without dhtOk this page would render those frozen numbers as
+    // though live — while the same failed read has forced the heater and
+    // humidifier off, i.e. showing a healthy temperature for a cold incubator.
+    // Mark them unmistakably instead of quietly displaying stale data.
+    const sensorOk = data.dhtOk !== false;
     $('tempReadout').innerHTML = (typeof data.temperature === 'number' ? data.temperature.toFixed(1) : '--') + ' &deg;C';
     $('humReadout').textContent = (typeof data.humidity === 'number' ? data.humidity.toFixed(0) : '--') + ' %';
+    $('tempReadout').style.opacity = sensorOk ? '1' : '0.45';
+    $('humReadout').style.opacity  = sensorOk ? '1' : '0.45';
+    $('sensorFaultMsg').style.display = sensorOk ? 'none' : 'block';
     setModeBadge('heaterModeBadge', !!data.heaterManualOverride);
     setBadge('heaterStatusBadge', !!data.heaterOn);
     setModeBadge('humidModeBadge', !!data.humidifierManualOverride);

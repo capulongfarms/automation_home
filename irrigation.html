@@ -527,10 +527,19 @@
     // A missing pressure value means the 4-20mA loop is open (broken wire or
     // unpowered transducer) - deliberately NOT rendered as 0 bar, which would
     // read as a healthy low-pressure system.
-    $('pressureVal').textContent = (typeof data.linePressureBar === 'number')
+    // Trust the device's explicit validity flag, NOT the presence of a number.
+    // A failed read is omitted from the push, so Firestore keeps serving the last
+    // good value - checking typeof would happily render that stale number as
+    // live, which for pressure is exactly the confusion the 4-20mA loop exists
+    // to prevent.
+    const pOk = data.pressureOk !== false;
+    const lOk = data.levelOk !== false;
+    $('pressureVal').textContent = (pOk && typeof data.linePressureBar === 'number')
       ? data.linePressureBar.toFixed(2) + ' bar' : 'SENSOR FAULT (4-20mA loop open)';
-    $('levelVal').textContent = (typeof data.waterLevelPercent === 'number')
-      ? data.waterLevelPercent.toFixed(0) + ' %' : '--';
+    $('pressureVal').style.color = pOk ? '' : '#c62828';
+    $('levelVal').textContent = (lOk && typeof data.waterLevelPercent === 'number')
+      ? data.waterLevelPercent.toFixed(0) + ' %' : 'SENSOR FAULT';
+    $('levelVal').style.color = lOk ? '' : '#c62828';
     $('rainVal').textContent = data.rainDetected ? 'Detected' : 'Clear';
 
     if (document.activeElement !== $('pressureTripInput')) $('pressureTripInput').value = data.pressureTripBar ?? 6;
