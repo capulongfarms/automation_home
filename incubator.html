@@ -204,6 +204,11 @@
           <td><span class="badge off" id="heaterStatusBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setMode('Heater','on')">ON</button></td>
           <td><button class="btn btn-off" onclick="setMode('Heater','off')">OFF</button></td></tr>
+        <tr><td>Heater 2</td>
+          <td><span class="mode-na">follows Heater</span></td>
+          <td><span class="badge off" id="heater2StatusBadge">OFF</span></td>
+          <td><button class="btn btn-on" onclick="setHeater2('on')">ENABLE</button></td>
+          <td><button class="btn btn-off" onclick="setHeater2('off')">DISABLE</button></td></tr>
         <tr><td>Humidifier</td>
           <td><button class="mode-badge auto" id="humidModeBadge" onclick="setMode('Humidifier','auto')">AUTO</button></td>
           <td><span class="badge off" id="humidStatusBadge">OFF</span></td>
@@ -239,6 +244,12 @@
             <td><button class="btn btn-save" onclick="saveTurnInterval()">Save</button></td></tr>
         </table>
         <button class="turn-now-btn" onclick="turnEggsNow()">Turn Eggs Now</button>
+        <!-- The turner is a ~5s pulse, not a latched output. The device pushes
+             on both edges of that pulse, so this badge does briefly show
+             RUNNING - it is the only remote confirmation that a turn happened. -->
+        <div style="text-align:center;margin-top:10px;font-size:0.9em;color:#555">
+          Turner motor: <span class="badge off" id="turnerBadge">OFF</span>
+        </div>
       </div>
       <div class="hatcher-note" id="eggTurningNA" style="display:none;">Not applicable in Hatcher Mode &mdash; eggs are not turned during hatching.</div>
     </div>
@@ -316,6 +327,17 @@
     setModeBadge('fanModeBadge', !!data.fanManualOverride);
     setBadge('fanStatusBadge', !!data.fanOn);
     setBadge('lightBadge', !!data.lightOn);
+
+    // Heater 2 has three meaningful states, not two: DISABLED (not
+    // participating), STANDBY (enabled but the thermostat isn't calling for
+    // heat), and ON. Showing a plain OFF for the first two would hide whether
+    // the second element is actually in the loop.
+    setBadge('heater2StatusBadge', !!data.heater2On);
+    $('heater2StatusBadge').textContent =
+      data.heater2Enabled ? (data.heater2On ? 'ON' : 'STANDBY') : 'DISABLED';
+
+    setBadge('turnerBadge', !!data.turnerOn);
+    $('turnerBadge').textContent = data.turnerOn ? 'RUNNING' : 'OFF';
     $('turnCurrent').textContent = (data.turnIntervalMinutes ?? 120) + ' min';
 
     const isHatcher = data.operationMode === 'hatcher';
@@ -404,6 +426,19 @@
 
     try {
       await setDoc(stateDocRef, update, { merge: true });
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  // Enables/disables the second heating element. Deliberately NOT a direct
+  // relay command: the device drives OT2 as (heater2Enabled && heaterOn), so
+  // the thermostat and the DHT fail-safe still govern when it energizes. There
+  // is no way from here to force an unthermostatted element on over the eggs.
+  window.setHeater2 = async function (state) {
+    try {
+      await setDoc(stateDocRef, { heater2Enabled: state === 'on' }, { merge: true });
+      $('syncNote').textContent = 'Heater 2 ' + (state === 'on' ? 'enabled' : 'disabled');
     } catch (e) {
       $('syncNote').textContent = 'Update failed: ' + e.message;
     }
