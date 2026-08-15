@@ -245,6 +245,15 @@
           <tr><td>Turn Interval</td><td id="turnCurrent">--</td>
             <td><input type="number" id="turnIntervalInput" step="5" min="15" max="1440"></td>
             <td><button class="btn btn-save" onclick="saveTurnInterval()">Save</button></td></tr>
+          <tr><td>Motor run<br><span style="font-weight:400;color:#999;font-size:0.9em">timeout if limits on</span></td>
+            <td id="turnSecsCurrent">--</td>
+            <td><input type="number" id="turnSecsInput" step="1" min="1" max="120"></td>
+            <td><button class="btn btn-save" onclick="saveTurnSecs()">Save</button></td></tr>
+          <tr><td>Limit switches</td>
+            <td><span class="badge off" id="turnLimitsBadge">OFF</span></td>
+            <td colspan="2">
+              <button class="btn btn-on" onclick="setTurnLimits('on')">Use</button>
+              <button class="btn btn-off" onclick="setTurnLimits('off')">Ignore</button></td></tr>
         </table>
         <button class="turn-now-btn" onclick="turnEggsNow()">Turn Eggs Now</button>
         <!-- The turner is a ~5s pulse, not a latched output. The device pushes
@@ -253,6 +262,13 @@
         <div style="text-align:center;margin-top:10px;font-size:0.9em;color:#555">
           Turner motor: <span class="badge off" id="turnerBadge">OFF</span>
         </div>
+        <!-- Ticked forward locally between pushes so it counts up smoothly,
+             but re-anchored to the DEVICE clock on every snapshot - the browser
+             clock is never used, so any skew between the two is irrelevant. -->
+        <div style="text-align:center;margin-top:6px;font-size:0.85em;color:#777">
+          Last turn: <span id="sinceTurn">--</span>
+        </div>
+        <div style="text-align:center;margin-top:6px;font-size:0.85em;color:#c62828;font-weight:600" id="turnerFaultMsg"></div>
       </div>
       <div class="hatcher-note" id="eggTurningNA" style="display:none;">Not applicable in Hatcher Mode &mdash; eggs are not turned during hatching.</div>
     </div>
@@ -319,6 +335,25 @@
     else { el.textContent = 'MANUAL'; el.className = 'mode-badge manual'; }
   }
 
+  let lastTurnEpoch = 0, deviceEpoch = 0, deviceEpochSeenAt = 0;
+
+  // Reconstructs "now" on the DEVICE's clock: the last epoch it reported, plus
+  // however long ago we received it. Never reads the browser's wall clock, so a
+  // phone in a different timezone or with a wrong clock still shows the truth.
+  function renderSinceTurn() {
+    const el = $('sinceTurn');
+    if (!el) return;
+    if (!lastTurnEpoch) { el.textContent = 'Never'; return; }
+    const now = deviceEpoch + Math.floor((Date.now() - deviceEpochSeenAt) / 1000);
+    let s = now - lastTurnEpoch;
+    if (s < 0) s = 0;
+    if (s < 60) { el.textContent = s + 's ago'; return; }
+    const m = Math.floor(s / 60);
+    el.textContent = (m < 60) ? (m + 'm ago')
+                              : (Math.floor(m / 60) + 'h ' + (m % 60) + 'm ago');
+  }
+  setInterval(renderSinceTurn, 1000);
+
   function renderState(data) {
     latestState = data;
     $('tempReadout').innerHTML = (typeof data.temperature === 'number' ? data.temperature.toFixed(1) : '--') + ' &deg;C';
@@ -347,6 +382,21 @@
 
     setBadge('turnerBadge', !!data.turnerOn);
     $('turnerBadge').textContent = data.turnerOn ? 'RUNNING' : 'OFF';
+
+    setBadge('turnLimitsBadge', !!data.turnerLimitsEnabled);
+    $('turnLimitsBadge').textContent = data.turnerLimitsEnabled ? 'IN USE' : 'OFF';
+    $('turnSecsCurrent').textContent = (data.turnerRunSeconds ?? 5) + ' s';
+    if (document.activeElement !== $('turnSecsInput')) {
+      $('turnSecsInput').value = data.turnerRunSeconds ?? 5;
+    }
+    $('turnerFaultMsg').textContent = data.turnerFault || '';
+
+    // Anchor the elapsed counter to the device's own clock, then let the local
+    // ticker carry it between snapshots.
+    lastTurnEpoch = data.lastTurnEpoch ?? 0;
+    deviceEpoch = data.currentEpoch ?? 0;
+    deviceEpochSeenAt = Date.now();
+    renderSinceTurn();
     $('turnCurrent').textContent = (data.turnIntervalMinutes ?? 120) + ' min';
     $('boosterDelayCurrent').textContent = (data.boosterDelayMinutes ?? 5) + ' min';
 
@@ -445,6 +495,26 @@
   // relay command: the device drives OT2 as (heater2Enabled && heaterOn), so
   // the thermostat and the DHT fail-safe still govern when it energizes. There
   // is no way from here to force an unthermostatted element on over the eggs.
+  window.saveTurnSecs = async function () {
+    try {
+      await setDoc(stateDocRef, {
+        turnerRunSeconds: parseInt($('turnSecsInput').value, 10)
+      }, { merge: true });
+      $('syncNote').textContent = 'Turner motor run time saved';
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  window.setTurnLimits = async function (state) {
+    try {
+      await setDoc(stateDocRef, { turnerLimitsEnabled: state === 'on' }, { merge: true });
+      $('syncNote').textContent = 'Limit switches ' + (state === 'on' ? 'in use' : 'ignored');
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
   window.saveBoosterDelay = async function () {
     try {
       await setDoc(stateDocRef, {
