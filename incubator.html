@@ -196,6 +196,9 @@
         <tr><td>Humidity</td><td id="humReadout">--</td>
           <td><input type="number" id="targetHumInput" step="1" min="20" max="90"></td>
           <td><button class="btn btn-save" onclick="saveHum()">Save</button></td></tr>
+        <tr><td>Booster delay</td><td id="boosterDelayCurrent">--</td>
+          <td><input type="number" id="boosterDelayInput" step="1" min="1" max="120"></td>
+          <td><button class="btn btn-save" onclick="saveBoosterDelay()">Save</button></td></tr>
       </table>
       <table>
         <tr><th></th><th>Mode</th><th>Status</th><th>Manual ON</th><th>Manual OFF</th></tr>
@@ -204,8 +207,8 @@
           <td><span class="badge off" id="heaterStatusBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setMode('Heater','on')">ON</button></td>
           <td><button class="btn btn-off" onclick="setMode('Heater','off')">OFF</button></td></tr>
-        <tr><td>Heater 2</td>
-          <td><span class="mode-na">follows Heater</span></td>
+        <tr><td>Heater 2 <span style="font-weight:400;color:#888;font-size:0.85em">(booster)</span></td>
+          <td><span class="mode-na">2nd stage</span></td>
           <td><span class="badge off" id="heater2StatusBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setHeater2('on')">ENABLE</button></td>
           <td><button class="btn btn-off" onclick="setHeater2('off')">DISABLE</button></td></tr>
@@ -332,13 +335,20 @@
     // participating), STANDBY (enabled but the thermostat isn't calling for
     // heat), and ON. Showing a plain OFF for the first two would hide whether
     // the second element is actually in the loop.
+    // Five distinct states, not two - a plain ON/OFF would collapse
+    // "disabled", "armed and counting down" and "already shed this run" into an
+    // indistinguishable OFF, which is exactly the information you need when
+    // asking why the booster did or didn't come in.
     setBadge('heater2StatusBadge', !!data.heater2On);
-    $('heater2StatusBadge').textContent =
-      data.heater2Enabled ? (data.heater2On ? 'ON' : 'STANDBY') : 'DISABLED';
+    $('heater2StatusBadge').textContent = data.heater2Status || '--';
+    if (document.activeElement !== $('boosterDelayInput')) {
+      $('boosterDelayInput').value = data.boosterDelayMinutes ?? 5;
+    }
 
     setBadge('turnerBadge', !!data.turnerOn);
     $('turnerBadge').textContent = data.turnerOn ? 'RUNNING' : 'OFF';
     $('turnCurrent').textContent = (data.turnIntervalMinutes ?? 120) + ' min';
+    $('boosterDelayCurrent').textContent = (data.boosterDelayMinutes ?? 5) + ' min';
 
     const isHatcher = data.operationMode === 'hatcher';
     $('opModeBadge').textContent = isHatcher ? 'HATCHER' : 'INCUBATOR';
@@ -435,6 +445,17 @@
   // relay command: the device drives OT2 as (heater2Enabled && heaterOn), so
   // the thermostat and the DHT fail-safe still govern when it energizes. There
   // is no way from here to force an unthermostatted element on over the eggs.
+  window.saveBoosterDelay = async function () {
+    try {
+      await setDoc(stateDocRef, {
+        boosterDelayMinutes: parseInt($('boosterDelayInput').value, 10)
+      }, { merge: true });
+      $('syncNote').textContent = 'Booster delay saved';
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
   window.setHeater2 = async function (state) {
     try {
       await setDoc(stateDocRef, { heater2Enabled: state === 'on' }, { merge: true });
