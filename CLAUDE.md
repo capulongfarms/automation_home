@@ -52,7 +52,7 @@ Its local source is `13.Headend/index.html` in the workspace. `14.Nodes/` delibe
 - **One shared device account for every ESP32** (`device@automation-home.local`), plus a personal login used by this web app. Devices are separated by **Firestore document path only**, not by credential.
 - Security Rules restrict all reads/writes to those UIDs — managed in Firebase Console → Firestore Database → Rules (not tracked in this repo).
 
-**This is a settled decision, confirmed 2026-08-13 — do not propose changing it.** An earlier version of this file recommended one dedicated Auth account per device and called reuse a "known divergence." That guidance has been retired. The owner was shown the trade-off explicitly — any one device's credentials can read and write every other device's document, which matters more now that the irrigation Node lives outside a locked building — and chose to keep the shared account, because document-level separation gives the state isolation actually wanted. Revisit only if the owner raises it, or if a device is lost or stolen.
+**This is a settled decision, confirmed 2026-08-15 — do not propose changing it.** An earlier version of this file recommended one dedicated Auth account per device and called reuse a "known divergence." That guidance has been retired. The owner was shown the trade-off explicitly — any one device's credentials can read and write every other device's document, which matters more now that the irrigation Node lives outside a locked building — and chose to keep the shared account, because document-level separation gives the state isolation actually wanted. Revisit only if the owner raises it, or if a device is lost or stolen.
 
 ## Key Gotchas
 
