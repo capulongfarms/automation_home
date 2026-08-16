@@ -459,6 +459,7 @@
         rain: !!nodeState.rainDetected,
         headLink: !!nodeState.headLinkAlive,
         veto: nodeState.lastVetoReason || '',
+        vetoAge: nodeState.vetoAgeSeconds ?? null,
         soilWet: nodeState.soilWetThreshold
       };
     }
@@ -471,6 +472,7 @@
         rain: !!headState.nodeRainDetected,
         headLink: !!headState.nodeLinkAlive,
         veto: '',
+        vetoAge: null,
         soilWet: nodeState ? nodeState.soilWetThreshold : undefined
       };
     }
@@ -608,7 +610,20 @@
       $('soilWetInput').value = s.soilWet;
     }
 
-    showBanner('vetoBanner', s.veto);
+    // A veto is only news while it is recent. The node clears the string on
+    // any successful open, but a long-standing one (soil still wet, nobody
+    // watering) would otherwise sit here looking like a live alarm - the same
+    // stale-information trap as the incubator's frozen temperature readings.
+    // Show the age past a minute, and stop shouting past an hour.
+    let vetoText = s.veto;
+    if (vetoText && typeof s.vetoAge === 'number' && s.vetoAge >= 60) {
+      const m = Math.floor(s.vetoAge / 60);
+      const age = (m < 60) ? (m + 'm ago') : (Math.floor(m / 60) + 'h ' + (m % 60) + 'm ago');
+      vetoText += '  (' + age + ')';
+    }
+    showBanner('vetoBanner', vetoText);
+    $('vetoBanner').className = 'banner veto'
+      + ((typeof s.vetoAge === 'number' && s.vetoAge >= 3600) ? ' stale' : '');
 
     // Direct control needs the node itself online. Via the mirror we can show
     // state but not command it, so say so rather than offering buttons that
