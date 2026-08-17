@@ -252,6 +252,10 @@
           <td><span class="badge off" id="heater2StatusBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setHeater2('on')">ENABLE</button></td>
           <td><button class="btn btn-off" onclick="setHeater2('off')">DISABLE</button></td></tr>
+        <tr><td>Sensors</td>
+          <td><span class="mode-na">primary / backup</span></td>
+          <td><span class="badge off" id="sensorBadge">--</span></td>
+          <td colspan="2" style="font-size:0.78em; color:#888" id="sensorNote"></td></tr>
         <tr><td>Reservoir</td>
           <td><span class="mode-na">float switch</span></td>
           <td><span class="badge off" id="waterBadge">--</span></td>
@@ -443,6 +447,21 @@
 
     // Reservoir. Empty is a fault state, not merely "off" - the humidifier
     // cannot run at all until it is refilled, so it gets the alarm colour.
+    // Redundancy state. Both healthy is the normal case; running on the backup
+    // is amber rather than red - still fully thermostatted, but the spare is
+    // spent and the next failure trips the fail-safe.
+    const pOk = data.primaryOk === true, bOk = data.backupOk === true;
+    const sb = $('sensorBadge');
+    if (pOk && bOk)       { sb.textContent = 'BOTH OK';   sb.style.background = '#4CAF50'; }
+    else if (pOk)         { sb.textContent = 'PRIMARY';   sb.style.background = '#a3690a'; }
+    else if (bOk)         { sb.textContent = 'ON BACKUP'; sb.style.background = '#a3690a'; }
+    else                  { sb.textContent = 'BOTH DEAD'; sb.style.background = '#c62828'; }
+    sb.className = 'badge';
+    $('sensorNote').textContent =
+      (pOk && bOk) ? 'Redundancy healthy'
+                   : (pOk || bOk) ? 'Replace the failed sensor — no spare left'
+                                  : 'Fail-safe active';
+
     const wOk = data.waterOk !== false;
     $('waterBadge').textContent = wOk ? 'WATER OK' : 'EMPTY';
     $('waterBadge').className = 'badge ' + (wOk ? 'on' : 'off');
