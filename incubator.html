@@ -194,6 +194,28 @@
       <div id="sensorFaultMsg" style="display:none; background:#fdecea; color:#c62828; border-left:5px solid #c62828; padding:10px 12px; border-radius:6px; margin-bottom:10px; font-size:0.85em; font-weight:600">
         SENSOR FAULT — DHT11 not reading.<br>
         <span style="font-weight:400">Values below are the last known reading, not live. Heater and humidifier are forced OFF by the safety fail-safe until the sensor recovers.</span>
+        <div style="margin-top:8px; font-weight:400">
+          If a batch is under way, you can override the fail-safe and run the heater
+          and humidifier <b>by hand</b> against a physical thermometer.
+          <button class="btn btn-on" style="margin-left:6px" onclick="setSensorOverride('on')">OVERRIDE</button>
+        </div>
+      </div>
+
+      <!-- Shown INSTEAD of the fault banner once armed. Deliberately the loudest
+           thing on the page: while this is up there is no thermostat and no
+           fail-safe, only whatever the operator last set by hand. -->
+      <div id="overrideMsg" style="display:none; background:#4a1010; color:#fff; border-left:5px solid #ff5252; padding:12px; border-radius:6px; margin-bottom:10px; font-size:0.85em">
+        <div style="font-weight:700; font-size:1.05em">⚠ FAIL-SAFE OVERRIDDEN — RUNNING BLIND</div>
+        <div style="margin-top:6px">
+          No usable sensor reading. Heater and humidifier follow <b>MANUAL settings only</b> —
+          AUTO counts as OFF, because there is nothing to thermostat against.
+          <b>Watch a physical thermometer.</b>
+        </div>
+        <div style="margin-top:6px">Heater 2 stays off throughout — one element by hand is manageable, two is not.</div>
+        <div style="margin-top:8px; font-weight:700">
+          Reverts automatically in <span id="overrideMins">--</span> minutes, or the moment the sensor recovers.
+          <button class="btn btn-off" style="margin-left:6px" onclick="setSensorOverride('off')">RESTORE FAIL-SAFE</button>
+        </div>
       </div>
       <table>
         <tr><th></th><th>Reading</th><th>Set Value</th><th></th></tr>
@@ -370,11 +392,18 @@
     // humidifier off, i.e. showing a healthy temperature for a cold incubator.
     // Mark them unmistakably instead of quietly displaying stale data.
     const sensorOk = data.dhtOk !== false;
+    const overridden = data.sensorFailOverride === true;
     $('tempReadout').innerHTML = (typeof data.temperature === 'number' ? data.temperature.toFixed(1) : '--') + ' &deg;C';
     $('humReadout').textContent = (typeof data.humidity === 'number' ? data.humidity.toFixed(0) : '--') + ' %';
     $('tempReadout').style.opacity = sensorOk ? '1' : '0.45';
     $('humReadout').style.opacity  = sensorOk ? '1' : '0.45';
-    $('sensorFaultMsg').style.display = sensorOk ? 'none' : 'block';
+
+    // The two banners are mutually exclusive. Showing the fault banner's
+    // OVERRIDE button while already overridden would invite arming it twice;
+    // showing the override banner with a healthy sensor would be a lie.
+    $('sensorFaultMsg').style.display = (!sensorOk && !overridden) ? 'block' : 'none';
+    $('overrideMsg').style.display    = overridden ? 'block' : 'none';
+    $('overrideMins').textContent     = data.sensorOverrideMinsLeft ?? '--';
     setModeBadge('heaterModeBadge', !!data.heaterManualOverride);
     setBadge('heaterStatusBadge', !!data.heaterOn);
     setModeBadge('humidModeBadge', !!data.humidifierManualOverride);
@@ -538,6 +567,28 @@
         boosterDelayMinutes: parseInt($('boosterDelayInput').value, 10)
       }, { merge: true });
       $('syncNote').textContent = 'Booster delay saved';
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  // Arming asks for confirmation; disarming never does. Restoring a safety
+  // interlock should be frictionless, and only the dangerous direction is worth
+  // a speed bump.
+  window.setSensorOverride = async function (state) {
+    if (state === 'on' && !confirm(
+        'Override the sensor fail-safe?\n\n' +
+        'The heater and humidifier will follow your MANUAL settings with no ' +
+        'temperature feedback at all. AUTO will count as OFF.\n\n' +
+        'Only do this if you are watching a physical thermometer. It reverts ' +
+        'automatically after 6 hours, or as soon as the sensor recovers.')) {
+      return;
+    }
+    try {
+      await setDoc(stateDocRef, { sensorFailOverride: state === 'on' }, { merge: true });
+      $('syncNote').textContent = (state === 'on')
+        ? 'Override requested — device will confirm within a few seconds'
+        : 'Fail-safe restore requested';
     } catch (e) {
       $('syncNote').textContent = 'Update failed: ' + e.message;
     }
