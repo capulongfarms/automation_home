@@ -155,6 +155,17 @@
     <div id="userEmail"></div>
     <h2>Incubator Control</h2>
 
+    <!-- Sits above everything: if something is wrong, it is the first thing
+         read, and it always names the reason. A buzzer with no stated cause is
+         one people learn to ignore. -->
+    <div id="alarmBanner" style="display:none; border-radius:8px; padding:12px 14px; margin-bottom:14px; text-align:left">
+      <div style="font-weight:700; font-size:0.95em" id="alarmText">&nbsp;</div>
+      <div style="margin-top:8px">
+        <button class="btn" id="muteBtn" style="background:#555" onclick="muteAlarm()">MUTE 30 MIN</button>
+        <span id="muteNote" style="font-size:0.8em; margin-left:8px; opacity:.85"></span>
+      </div>
+    </div>
+
     <div class="group group0">
       <h3>Egg Type &amp; Operation Mode</h3>
       <div class="egg-type-row">
@@ -241,6 +252,10 @@
           <td><span class="badge off" id="heater2StatusBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setHeater2('on')">ENABLE</button></td>
           <td><button class="btn btn-off" onclick="setHeater2('off')">DISABLE</button></td></tr>
+        <tr><td>Reservoir</td>
+          <td><span class="mode-na">float switch</span></td>
+          <td><span class="badge off" id="waterBadge">--</span></td>
+          <td colspan="2" style="font-size:0.78em; color:#888">Humidifier is inhibited when empty</td></tr>
         <tr><td>Humidifier</td>
           <td><button class="mode-badge auto" id="humidModeBadge" onclick="setMode('Humidifier','auto')">AUTO</button></td>
           <td><span class="badge off" id="humidStatusBadge">OFF</span></td>
@@ -426,6 +441,30 @@
       $('boosterDelayInput').value = data.boosterDelayMinutes ?? 5;
     }
 
+    // Reservoir. Empty is a fault state, not merely "off" - the humidifier
+    // cannot run at all until it is refilled, so it gets the alarm colour.
+    const wOk = data.waterOk !== false;
+    $('waterBadge').textContent = wOk ? 'WATER OK' : 'EMPTY';
+    $('waterBadge').className = 'badge ' + (wOk ? 'on' : 'off');
+    $('waterBadge').style.background = wOk ? '' : '#c62828';
+
+    // Alarm banner. Urgent conditions are red; everything else amber, because
+    // a page where every warning looks identical trains you to ignore all of them.
+    const ar = data.alarmReason || '';
+    const ab = $('alarmBanner');
+    if (ar) {
+      const urgent = data.alarmUrgent === true;
+      ab.style.display = 'block';
+      ab.style.background = urgent ? '#fdecea' : '#fff6e3';
+      ab.style.borderLeft = '5px solid ' + (urgent ? '#c62828' : '#a3690a');
+      ab.style.color = urgent ? '#c62828' : '#a3690a';
+      $('alarmText').textContent = (urgent ? '⚠ ' : '') + ar;
+      $('muteNote').textContent = data.alarmMuted ? 'Muted - will re-sound if it changes' : '';
+      $('muteBtn').style.display = data.alarmMuted ? 'none' : 'inline-block';
+    } else {
+      ab.style.display = 'none';
+    }
+
     setBadge('turnerBadge', !!data.turnerOn);
     $('turnerBadge').textContent = data.turnerOn ? 'RUNNING' : 'OFF';
 
@@ -575,6 +614,15 @@
   // Arming asks for confirmation; disarming never does. Restoring a safety
   // interlock should be frictionless, and only the dangerous direction is worth
   // a speed bump.
+  window.muteAlarm = async function () {
+    try {
+      await setDoc(stateDocRef, { muteAlarmRequest: true }, { merge: true });
+      $('syncNote').textContent = 'Mute requested - 30 minutes, or until the condition changes';
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
   window.setSensorOverride = async function (state) {
     if (state === 'on' && !confirm(
         'Override the sensor fail-safe?\n\n' +
