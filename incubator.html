@@ -100,7 +100,28 @@
   .mLbl { font: 600 11px Arial, sans-serif; fill: #607d8b; }
   .mVal { font: 700 13px Arial, sans-serif; fill: #263238; }
 
+  /* Tappable equipment. The mimic issues NO commands - a tap scrolls to the
+     control that governs that item and flashes it. Two reasons it works this
+     way rather than toggling:
+
+       1. A stray touch must not be able to start a heater over live eggs.
+          Real HMIs open a faceplate on tap for exactly this reason.
+       2. Heater/humidifier/fan are THREE-state here - AUTO, MANUAL-ON,
+          MANUAL-OFF - and a toggle cannot express that. Worse, a tap that
+          silently dropped the heater out of AUTO would be a genuine hazard,
+          and a tap that appeared to do nothing (because the DHT fail-safe is
+          holding the heater off) would just look broken. The table row says
+          why; an icon cannot. */
+  .hit { cursor: pointer; }
+  .hit:focus { outline: 2px solid #1565c0; outline-offset: 2px; }
+  .hit:active .eq, .hit:active .ln { opacity: .55; }
+
   @keyframes mFlash { 50% { opacity: .25; } }
+  @keyframes mPing {
+    0%, 100% { background-color: transparent; }
+    25%, 75% { background-color: #fff3c4; }
+  }
+  .jumpTarget { animation: mPing 1.4s ease-in-out 1; }
   @keyframes mSpin  { to { transform: rotate(360deg); } }
 
   /* Spin lives on inner groups so the parent can keep its own positioning
@@ -252,7 +273,8 @@
         <line x1="40" y1="380" x2="480" y2="380" stroke="#dfe5ea" stroke-width="1.5"/>
 
         <!-- ---------- circulation fan ---------- -->
-        <g>
+        <g class="hit" tabindex="0" role="button" aria-label="Fan status - open fan control"
+           onclick="mJump('fanModeBadge')" onkeydown="mKey(event,'fanModeBadge')">
           <circle cx="260" cy="46" r="19" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
           <g id="mFan" class="spin">
             <path class="eq off" stroke-width="1.5" d="M260,32 q7,9 0,14 q-7,-5 0,-14 Z"/>
@@ -265,6 +287,9 @@
         <text class="mLbl" x="288" y="50">Fan</text>
 
         <!-- ---------- turner motors + chain (left wall) ---------- -->
+        <g class="hit" tabindex="0" role="button" aria-label="Egg turner status - open egg-turning controls"
+           onclick="mJump('eggTurningControls')" onkeydown="mKey(event,'eggTurningControls')">
+        <rect x="66" y="142" width="66" height="170" fill="transparent"/>
         <rect x="74" y="150" width="46" height="120" rx="8" fill="none" stroke="#dfe5ea" stroke-width="1.5"/>
         <path id="mChain" class="ln off" stroke-width="2.5" stroke-dasharray="5 4"
               d="M85,178 L85,242 M109,178 L109,242"/>
@@ -284,6 +309,7 @@
         </g>
         <text class="mLbl" x="72" y="288">Turner</text>
         <text class="mLbl" id="mTurnDir" x="72" y="302">CW / CCW</text>
+        </g>
 
         <!-- ---------- egg tray ---------- -->
         <g id="mTray" class="tray tiltA">
@@ -299,34 +325,46 @@
         <path d="M244,246 L280,246" stroke="#cfd8dc" stroke-width="3" stroke-linecap="round"/>
 
         <!-- ---------- sensors (right wall) ---------- -->
-        <g>
+        <g class="hit" tabindex="0" role="button" aria-label="Primary sensor status - open sensor status"
+           onclick="mJump('sensorBadge')" onkeydown="mKey(event,'sensorBadge')">
           <rect id="mSenP" class="eq off" x="424" y="150" width="16" height="30" rx="3" stroke-width="1.5"/>
           <line x1="432" y1="180" x2="432" y2="196" stroke="#cfd8dc" stroke-width="1.5"/>
           <text class="mLbl" x="398" y="146">TEM1</text>
         </g>
-        <g>
+        <g class="hit" tabindex="0" role="button" aria-label="Backup sensor status - open sensor status"
+           onclick="mJump('sensorBadge')" onkeydown="mKey(event,'sensorBadge')">
           <rect id="mSenB" class="eq off" x="424" y="220" width="16" height="30" rx="3" stroke-width="1.5"/>
           <line x1="432" y1="250" x2="432" y2="266" stroke="#cfd8dc" stroke-width="1.5"/>
           <text class="mLbl" x="398" y="216">TEM2</text>
         </g>
 
         <!-- ---------- heaters ---------- -->
-        <path id="mHt1" class="ln off" stroke-width="4" stroke-linecap="round"
-              d="M120,318 l14,-11 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-11"/>
-        <text class="mLbl" x="310" y="322">Heater 1</text>
-        <path id="mHt2" class="ln off" stroke-width="4" stroke-linecap="round"
-              d="M120,356 l14,-11 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-11"/>
-        <text class="mLbl" x="310" y="360">Heater 2</text>
+        <g class="hit" tabindex="0" role="button" aria-label="Heater 1 status - open heater control"
+           onclick="mJump('heaterModeBadge')" onkeydown="mKey(event,'heaterModeBadge')">
+          <rect x="112" y="298" width="250" height="34" fill="transparent"/>
+          <path id="mHt1" class="ln off" stroke-width="4" stroke-linecap="round"
+                d="M120,318 l14,-11 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-11"/>
+          <text class="mLbl" x="310" y="322">Heater 1</text>
+        </g>
+        <g class="hit" tabindex="0" role="button" aria-label="Heater 2 status - open booster control"
+           onclick="mJump('heater2StatusBadge')" onkeydown="mKey(event,'heater2StatusBadge')">
+          <rect x="112" y="336" width="250" height="34" fill="transparent"/>
+          <path id="mHt2" class="ln off" stroke-width="4" stroke-linecap="round"
+                d="M120,356 l14,-11 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-11"/>
+          <text class="mLbl" x="310" y="360">Heater 2</text>
+        </g>
 
         <!-- ---------- humidifier + reservoir ---------- -->
-        <g>
+        <g class="hit" tabindex="0" role="button" aria-label="Humidifier status - open humidifier control"
+           onclick="mJump('humidModeBadge')" onkeydown="mKey(event,'humidModeBadge')">
           <circle class="mist d0" cx="112" cy="410" r="6" fill="#81d4fa"/>
           <circle class="mist d1" cx="124" cy="410" r="5" fill="#81d4fa"/>
           <circle class="mist d2" cx="100" cy="410" r="4" fill="#81d4fa"/>
           <rect id="mHumid" class="eq off" x="92" y="412" width="40" height="24" rx="4" stroke-width="1.5"/>
           <text class="mLbl" x="140" y="429">Humidifier</text>
         </g>
-        <g>
+        <g class="hit" tabindex="0" role="button" aria-label="Reservoir level - open reservoir status"
+           onclick="mJump('waterBadge')" onkeydown="mKey(event,'waterBadge')">
           <rect id="mTank" x="360" y="398" width="76" height="40" rx="4" fill="#fff" stroke="#b0bec5" stroke-width="1.5"/>
           <rect id="mWater" x="362" y="414" width="72" height="22" rx="3" fill="#4fc3f7"/>
           <text class="mLbl" id="mWaterLbl" x="360" y="392">Reservoir</text>
@@ -341,7 +379,8 @@
       </svg>
       </div>
       <div style="text-align:center;margin-top:6px;font-size:0.75em;color:#78909c">
-        Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault
+Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault<br>
+        <span style="opacity:.8">Tap any item to jump to its controls</span>
       </div>
     </div>
 
@@ -632,6 +671,27 @@
     el.classList.toggle('run', !!running);
     el.classList.toggle('rev', !!reverse);
   }
+
+  // Navigation only. Scrolls the governing control into view and pings it, so
+  // the tap has a visible destination rather than silently moving the page.
+  function mJump(targetId) {
+    const el = document.getElementById(targetId);
+    if (!el) return;
+    const row = el.closest('tr') || el.closest('.group') || el;
+    row.scrollIntoView({ behavior: 'smooth', block: 'center' });
+    row.classList.remove('jumpTarget');
+    void row.offsetWidth;          // restart the animation if the same row is tapped twice
+    row.classList.add('jumpTarget');
+    setTimeout(() => row.classList.remove('jumpTarget'), 1600);
+  }
+
+  // SVG elements are not natively keyboard-operable, so Enter/Space are wired
+  // by hand to match what a real button would do.
+  function mKey(ev, targetId) {
+    if (ev.key === 'Enter' || ev.key === ' ') { ev.preventDefault(); mJump(targetId); }
+  }
+  window.mJump = mJump;
+  window.mKey = mKey;
 
   function renderMimic(d) {
     const fault = !!(d.turnerFault && d.turnerFault.length);
