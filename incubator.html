@@ -339,6 +339,10 @@
       <div class="hatcher-note" id="eggTurningNA" style="display:none;">Not applicable in Hatcher Mode &mdash; eggs are not turned during hatching.</div>
     </div>
 
+    <div style="text-align:center;margin-top:10px;color:#777;font-size:0.85em">
+      Link: <b id="netName">--</b>
+    </div>
+
     <div id="syncNote">Connecting...</div>
     <button id="signOutBtn" onclick="signOutUser()">Sign out</button>
   </div>
@@ -510,6 +514,7 @@
     $('turnDepCurrent').textContent = (data.turnerDepartSeconds ?? 3) + ' s';
     $('turnTrvCurrent').textContent = (data.turnerTravelSeconds ?? 30) + ' s';
     $('nextTurnDir').textContent = data.nextTurnDir || '--';
+    $('netName').textContent = data.network || '--';
     $('turnTravelMs').textContent = data.turnerLastTravelMs ? (data.turnerLastTravelMs / 1000).toFixed(1) + ' s' : '--';
     $('turnTravelMax').textContent = data.turnerMaxTravelMs ? (data.turnerMaxTravelMs / 1000).toFixed(1) + ' s' : '--';
     $('turnerClearWrap').hidden = !(data.turnerFault && data.turnerFault.length);
