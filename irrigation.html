@@ -302,6 +302,7 @@
         <div class="row"><span>Soil moisture</span><span id="soilVal">&mdash;</span></div>
         <div class="row"><span>Rain</span><span id="nodeRainVal">&mdash;</span></div>
         <div class="row"><span>Headend LoRa link</span><span class="badge off" id="headLinkBadge">&mdash;</span></div>
+        <div class="row"><span>Node network</span><span id="nodeNet">&mdash;</span></div>
       </div>
 
       <div class="group group-cfg">
@@ -319,6 +320,10 @@
           <span><button class="btn btn-blue" onclick="saveNodeThresholds()">Save thresholds</button></span>
         </div>
       </div>
+    </div>
+
+    <div style="text-align:center;margin-top:8px;color:#777;font-size:0.85em">
+      Headend link: <b id="headNet">&mdash;</b>
     </div>
 
     <div id="syncNote">Connecting...</div>
@@ -458,6 +463,7 @@
         soil: nodeState.soilMoisturePercent,
         rain: !!nodeState.rainDetected,
         headLink: !!nodeState.headLinkAlive,
+        network: nodeState.network || null,
         veto: nodeState.lastVetoReason || '',
         vetoAge: nodeState.vetoAgeSeconds ?? null,
         soilWet: nodeState.soilWetThreshold
@@ -505,6 +511,8 @@
   function renderHeadend() {
     const data = headState;
     if (!data) return;
+
+    $('headNet').textContent = data.network || '—';
 
     setBadge('pumpABadge', !!data.pumpARunning, data.pumpARunning ? 'RUNNING' : 'OFF');
     setBadge('pumpBBadge', !!data.pumpBRunning, data.pumpBRunning ? 'RUNNING' : 'OFF');
@@ -582,6 +590,11 @@
   function renderNode() {
     const s = resolvedNode();
     if (!s) return;
+
+    // Blank rather than "offline" when the value is absent: the Node may be
+    // reaching us through the Headend's LoRa mirror, which carries no network
+    // field, and showing "offline" there would be actively misleading.
+    $('nodeNet').textContent = s.network || '—';
 
     const list = $('zoneList');
     list.innerHTML = '';
