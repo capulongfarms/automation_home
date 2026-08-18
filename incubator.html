@@ -69,6 +69,68 @@
   .readout { display: flex; justify-content: space-between; margin: 6px 0; font-size: 1.05em; }
   .readout b { font-size: 1.2em; }
 
+
+  /* ---------------- HMI mimic ----------------
+     Colour follows the high-performance-HMI convention (ISA-101), NOT the
+     intuitive one: colour is reserved for ABNORMAL conditions.
+
+       off / idle  grey  - most equipment is legitimately off most of the time,
+                           so this is the quiet default and carries no alarm
+       running     green - energised and healthy
+       fault       red   - and ONLY fault, so any red on the panel means "look"
+
+     Painting OFF in red would leave the panel permanently half-red, and a real
+     fault at 3am would then look exactly like a fan that is simply not running.
+     That is the failure this convention exists to prevent. */
+  .groupM { background: #eef2f5; }
+  .groupM h3 { color: #37474f; }
+  .mimicWrap { width: 100%; overflow-x: auto; }
+  .mimic { display: block; width: 100%; max-width: 520px; height: auto; margin: 0 auto; }
+
+  .eq   { transition: fill .35s ease, stroke .35s ease; }
+  .eq.off   { fill: #eef1f4; stroke: #b6bec6; }
+  .eq.on    { fill: #4CAF50; stroke: #2e7d32; }
+  .eq.fault { fill: #ffcdd2; stroke: #c62828; animation: mFlash 1s steps(2, end) infinite; }
+
+  .ln  { transition: stroke .35s ease; fill: none; }
+  .ln.off   { stroke: #b6bec6; }
+  .ln.on    { stroke: #4CAF50; }
+  .ln.fault { stroke: #c62828; animation: mFlash 1s steps(2, end) infinite; }
+
+  .mLbl { font: 600 11px Arial, sans-serif; fill: #607d8b; }
+  .mVal { font: 700 13px Arial, sans-serif; fill: #263238; }
+
+  @keyframes mFlash { 50% { opacity: .25; } }
+  @keyframes mSpin  { to { transform: rotate(360deg); } }
+
+  /* Spin lives on inner groups so the parent can keep its own positioning
+     transform - nesting is what keeps transform-origin sane in SVG. */
+  .spin { transform-box: fill-box; transform-origin: center; }
+  .spin.run { animation: mSpin 1.1s linear infinite; }
+  .spin.run.rev { animation-direction: reverse; }
+  .spin.slow.run { animation-duration: 2.4s; }
+
+  /* The tray does not jump between positions - it TRANSITIONS, so a turn is
+     visible as movement rather than as a state change you have to notice. */
+  .tray { transition: transform 2.8s ease-in-out; transform-box: fill-box; transform-origin: center; }
+  .tray.tiltA { transform: rotate(-9deg); }
+  .tray.tiltB { transform: rotate(9deg); }
+
+  .mist { opacity: 0; }
+  .mist.run { animation: mMist 1.8s ease-out infinite; }
+  .mist.run.d1 { animation-delay: .6s; }
+  .mist.run.d2 { animation-delay: 1.2s; }
+  @keyframes mMist {
+    0%   { opacity: 0;   transform: translateY(0) scale(.6); }
+    30%  { opacity: .75; }
+    100% { opacity: 0;   transform: translateY(-26px) scale(1.5); }
+  }
+
+  @media (prefers-reduced-motion: reduce) {
+    .spin.run, .mist.run, .eq.fault, .ln.fault { animation: none; }
+    #mTray { transition: none; }
+  }
+
   .badge { padding: 4px 10px; border-radius: 12px; color: white; font-weight: 700; font-size: 0.72em; }
   .badge.on  { background-color: #4CAF50; }
   .badge.off { background-color: #999; }
@@ -163,6 +225,123 @@
       <div style="margin-top:8px">
         <button class="btn" id="muteBtn" style="background:#555" onclick="muteAlarm()">MUTE 30 MIN</button>
         <span id="muteNote" style="font-size:0.8em; margin-left:8px; opacity:.85"></span>
+      </div>
+    </div>
+
+
+    <!-- ================= HMI mimic =================
+         A consumer of state, nothing more - it sends no commands and adds no
+         Firestore fields. Every value below was already being published for the
+         tables further down the page; this only draws them.
+
+         It answers a different question from the tables: "what is happening
+         right now", readable across the room, versus "what exactly", readable
+         up close. Both are wanted, which is why this sits above them rather
+         than replacing them. -->
+    <div class="group groupM">
+      <h3>Incubator</h3>
+      <div class="mimicWrap">
+      <svg class="mimic" viewBox="0 0 520 470" role="img"
+           aria-label="Schematic of the incubator cabinet showing live status of the fan, egg tray and its two turner motors, both heaters, the humidifier and its reservoir, and the two temperature sensors.">
+
+        <!-- cabinet shell. Outline turns red on an urgent alarm, so a fault is
+             visible even if the specific faulted item is off-screen on a phone -->
+        <rect id="mFrame" class="ln off" x="40" y="20" width="440" height="430" rx="14" stroke-width="3"/>
+        <rect x="40" y="20" width="440" height="430" rx="14" fill="#fbfcfd" opacity=".55"/>
+        <line x1="40" y1="72" x2="480" y2="72" stroke="#dfe5ea" stroke-width="1.5"/>
+        <line x1="40" y1="380" x2="480" y2="380" stroke="#dfe5ea" stroke-width="1.5"/>
+
+        <!-- ---------- circulation fan ---------- -->
+        <g>
+          <circle cx="260" cy="46" r="19" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
+          <g id="mFan" class="spin">
+            <path class="eq off" stroke-width="1.5" d="M260,32 q7,9 0,14 q-7,-5 0,-14 Z"/>
+            <path class="eq off" stroke-width="1.5" d="M274,46 q-9,7 -14,0 q5,-7 14,0 Z"/>
+            <path class="eq off" stroke-width="1.5" d="M260,60 q-7,-9 0,-14 q7,5 0,14 Z"/>
+            <path class="eq off" stroke-width="1.5" d="M246,46 q9,-7 14,0 q-5,7 -14,0 Z"/>
+          </g>
+          <circle cx="260" cy="46" r="3" fill="#90a4ae"/>
+        </g>
+        <text class="mLbl" x="288" y="50">Fan</text>
+
+        <!-- ---------- turner motors + chain (left wall) ---------- -->
+        <rect x="74" y="150" width="46" height="120" rx="8" fill="none" stroke="#dfe5ea" stroke-width="1.5"/>
+        <path id="mChain" class="ln off" stroke-width="2.5" stroke-dasharray="5 4"
+              d="M85,178 L85,242 M109,178 L109,242"/>
+        <g>
+          <circle cx="97" cy="178" r="15" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
+          <g id="mMotA" class="spin slow">
+            <path class="eq off" stroke-width="1.5" d="M97,166 L100,178 L97,190 L94,178 Z"/>
+            <path class="eq off" stroke-width="1.5" d="M85,178 L97,175 L109,178 L97,181 Z"/>
+          </g>
+        </g>
+        <g>
+          <circle cx="97" cy="242" r="15" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
+          <g id="mMotB" class="spin slow">
+            <path class="eq off" stroke-width="1.5" d="M97,230 L100,242 L97,254 L94,242 Z"/>
+            <path class="eq off" stroke-width="1.5" d="M85,242 L97,239 L109,242 L97,245 Z"/>
+          </g>
+        </g>
+        <text class="mLbl" x="72" y="288">Turner</text>
+        <text class="mLbl" id="mTurnDir" x="72" y="302">CW / CCW</text>
+
+        <!-- ---------- egg tray ---------- -->
+        <g id="mTray" class="tray tiltA">
+          <rect x="152" y="192" width="220" height="30" rx="5" fill="#fff" stroke="#b0bec5" stroke-width="2"/>
+          <g fill="#e8d8b8" stroke="#c9b48a" stroke-width="1.2">
+            <ellipse cx="176" cy="207" rx="8" ry="10"/><ellipse cx="200" cy="207" rx="8" ry="10"/>
+            <ellipse cx="224" cy="207" rx="8" ry="10"/><ellipse cx="248" cy="207" rx="8" ry="10"/>
+            <ellipse cx="272" cy="207" rx="8" ry="10"/><ellipse cx="296" cy="207" rx="8" ry="10"/>
+            <ellipse cx="320" cy="207" rx="8" ry="10"/><ellipse cx="344" cy="207" rx="8" ry="10"/>
+          </g>
+        </g>
+        <path d="M262,232 L262,246" stroke="#cfd8dc" stroke-width="2"/>
+        <path d="M244,246 L280,246" stroke="#cfd8dc" stroke-width="3" stroke-linecap="round"/>
+
+        <!-- ---------- sensors (right wall) ---------- -->
+        <g>
+          <rect id="mSenP" class="eq off" x="424" y="150" width="16" height="30" rx="3" stroke-width="1.5"/>
+          <line x1="432" y1="180" x2="432" y2="196" stroke="#cfd8dc" stroke-width="1.5"/>
+          <text class="mLbl" x="398" y="146">TEM1</text>
+        </g>
+        <g>
+          <rect id="mSenB" class="eq off" x="424" y="220" width="16" height="30" rx="3" stroke-width="1.5"/>
+          <line x1="432" y1="250" x2="432" y2="266" stroke="#cfd8dc" stroke-width="1.5"/>
+          <text class="mLbl" x="398" y="216">TEM2</text>
+        </g>
+
+        <!-- ---------- heaters ---------- -->
+        <path id="mHt1" class="ln off" stroke-width="4" stroke-linecap="round"
+              d="M120,318 l14,-11 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-11"/>
+        <text class="mLbl" x="310" y="322">Heater 1</text>
+        <path id="mHt2" class="ln off" stroke-width="4" stroke-linecap="round"
+              d="M120,356 l14,-11 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-11"/>
+        <text class="mLbl" x="310" y="360">Heater 2</text>
+
+        <!-- ---------- humidifier + reservoir ---------- -->
+        <g>
+          <circle class="mist d0" cx="112" cy="410" r="6" fill="#81d4fa"/>
+          <circle class="mist d1" cx="124" cy="410" r="5" fill="#81d4fa"/>
+          <circle class="mist d2" cx="100" cy="410" r="4" fill="#81d4fa"/>
+          <rect id="mHumid" class="eq off" x="92" y="412" width="40" height="24" rx="4" stroke-width="1.5"/>
+          <text class="mLbl" x="140" y="429">Humidifier</text>
+        </g>
+        <g>
+          <rect id="mTank" x="360" y="398" width="76" height="40" rx="4" fill="#fff" stroke="#b0bec5" stroke-width="1.5"/>
+          <rect id="mWater" x="362" y="414" width="72" height="22" rx="3" fill="#4fc3f7"/>
+          <text class="mLbl" id="mWaterLbl" x="360" y="392">Reservoir</text>
+        </g>
+
+        <!-- ---------- readouts ---------- -->
+        <text class="mLbl" x="152" y="104">TEMPERATURE</text>
+        <text class="mVal" id="mTempTxt" x="152" y="128" style="font-size:22px">--</text>
+        <text class="mLbl" x="290" y="104">HUMIDITY</text>
+        <text class="mVal" id="mHumTxt" x="290" y="128" style="font-size:22px">--</text>
+        <text class="mLbl" id="mDayTxt" x="60" y="104">--</text>
+      </svg>
+      </div>
+      <div style="text-align:center;margin-top:6px;font-size:0.75em;color:#78909c">
+        Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault
       </div>
     </div>
 
@@ -424,7 +603,127 @@
   }
   setInterval(renderSinceTurn, 1000);
 
+
+  // ---------- HMI mimic ----------
+  // Pure consumer of the same snapshot the tables use. Deliberately tolerant of
+  // missing fields: an older firmware build, or a document written before a
+  // field existed, must degrade to "off" rather than throwing and taking the
+  // rest of renderState() down with it.
+  // Applies a state class to an element and to any paths inside it, scoped
+  // through the element rather than a document-wide selector.
+  function setEqTree(id, state) {
+    const el = $(id);
+    if (!el) return;
+    const apply = (t) => { t.classList.remove('off','on','fault'); t.classList.add(state); };
+    apply(el);
+    el.querySelectorAll('path, rect, circle').forEach(apply);
+  }
+
+  function setEq(id, state) {
+    const el = $(id);
+    if (!el) return;
+    el.classList.remove('off', 'on', 'fault');
+    el.classList.add(state);
+  }
+
+  function setSpin(id, running, reverse) {
+    const el = $(id);
+    if (!el) return;
+    el.classList.toggle('run', !!running);
+    el.classList.toggle('rev', !!reverse);
+  }
+
+  function renderMimic(d) {
+    const fault = !!(d.turnerFault && d.turnerFault.length);
+    const urgent = !!d.alarmUrgent;
+
+    // Cabinet outline carries the urgent alarm, so a fault registers even when
+    // the faulted item itself is scrolled out of view on a phone.
+    setEq('mFrame', urgent ? 'fault' : 'off');
+
+    // Fan
+    setEqTree('mFan', d.fanOn ? 'on' : 'off');
+    setSpin('mFan', d.fanOn, false);
+
+    // Heaters
+    setEq('mHt1', d.heaterOn ? 'on' : 'off');
+    setEq('mHt2', d.heater2On ? 'on' : 'off');
+
+    // Humidifier. A dry reservoir is a fault on the humidifier itself, because
+    // that is the thing the operator has to act on - the firmware blocks the
+    // mister outright when waterOk is false, with no override.
+    setEq('mHumid', (d.waterOk === false) ? 'fault' : (d.humidifierOn ? 'on' : 'off'));
+    const misting = !!d.humidifierOn && d.waterOk !== false;
+    const humEl = $('mHumid');
+    if (humEl && humEl.parentNode) {
+      humEl.parentNode.querySelectorAll('.mist').forEach(el => el.classList.toggle('run', misting));
+    }
+
+    // Reservoir
+    const dry = d.waterOk === false;
+    const water = $('mWater');
+    if (water) {
+      water.setAttribute('y', dry ? '430' : '414');
+      water.setAttribute('height', dry ? '6' : '22');
+      water.setAttribute('fill', dry ? '#ef9a9a' : '#4fc3f7');
+    }
+    if ($('mWaterLbl')) {
+      $('mWaterLbl').textContent = dry ? 'Reservoir LOW' : 'Reservoir';
+      $('mWaterLbl').setAttribute('fill', dry ? '#c62828' : '#607d8b');
+    }
+
+    // Sensors - the ACTIVE one is green, a failed one red, a healthy standby
+    // grey. That distinction is the whole point of running two: "on backup" is
+    // a different fact from "both fine", and it should be visible at a glance
+    // rather than buried in a status string.
+    const act = d.activeSensor;
+    setEq('mSenP', d.primaryOk === false ? 'fault' : (act === 'primary' ? 'on' : 'off'));
+    setEq('mSenB', d.backupOk === false ? 'fault' : (act === 'backup' ? 'on' : 'off'));
+
+    // Turner. Direction-aware: the two motors are physically opposite, so only
+    // the one being driven spins, and it spins the correct way.
+    const running = !!d.turnerOn;
+    const cw = d.turnerDir === 'CW';
+    const motState = fault ? 'fault' : (running ? 'on' : 'off');
+    setEqTree('mMotA', motState);
+    setEqTree('mMotB', motState);
+    setSpin('mMotA', running && cw, false);
+    setSpin('mMotB', running && !cw, true);
+    setEq('mChain', fault ? 'fault' : (running ? 'on' : 'off'));
+    if ($('mTurnDir')) {
+      $('mTurnDir').textContent = fault ? 'FAULT'
+                                : running ? ('running ' + (d.turnerDir || ''))
+                                : ('next ' + (d.nextTurnDir || '--'));
+      $('mTurnDir').setAttribute('fill', fault ? '#c62828' : '#607d8b');
+    }
+
+    // Tray angle. Position is not published - the two end-stops are wired in
+    // parallel, so the firmware genuinely does not know which end it is at.
+    // It is inferred instead: direction alternates every turn, so a tray whose
+    // NEXT move is CW must currently be sitting at the CCW end. While a turn is
+    // running we point at the end being driven towards, and the CSS transition
+    // makes that read as the tray actually travelling.
+    const tray = $('mTray');
+    if (tray) {
+      const atCw = running ? cw : (d.nextTurnDir === 'CCW');
+      tray.classList.toggle('tiltB', atCw);
+      tray.classList.toggle('tiltA', !atCw);
+    }
+
+    // Readouts
+    if ($('mTempTxt')) $('mTempTxt').textContent =
+      (typeof d.temperature === 'number' && d.dhtOk !== false) ? d.temperature.toFixed(1) + '\u00B0C' : '--';
+    if ($('mHumTxt')) $('mHumTxt').textContent =
+      (typeof d.humidity === 'number' && d.dhtOk !== false) ? Math.round(d.humidity) + '%' : '--';
+    if ($('mDayTxt')) $('mDayTxt').textContent =
+      d.cycleActive ? ('DAY ' + (d.cycleDay ?? '?')) : 'NOT STARTED';
+  }
+
   function renderState(data) {
+    // Guarded: the mimic is decorative relative to the controls below it, so a
+    // fault in drawing must never prevent the numbers and buttons from updating.
+    try { renderMimic(data); } catch (e) { console.warn('mimic render failed', e); }
+
     latestState = data;
     // A failed DHT read cannot be pushed (NaN is invalid JSON), so the device
     // omits temperature/humidity and Firestore keeps serving the LAST GOOD
