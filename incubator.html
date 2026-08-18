@@ -269,7 +269,7 @@
     </div>
 
     <div class="group group2">
-      <h3>Fan and Lighting Control</h3>
+      <h3>Fan Control</h3>
       <table>
         <tr><th></th><th>Mode</th><th>Status</th><th>Manual ON</th><th>Manual OFF</th></tr>
         <tr><td>Fan</td>
@@ -277,11 +277,6 @@
           <td><span class="badge off" id="fanStatusBadge">OFF</span></td>
           <td><button class="btn btn-on" onclick="setMode('Fan','on')">ON</button></td>
           <td><button class="btn btn-off" onclick="setMode('Fan','off')">OFF</button></td></tr>
-        <tr><td>Light</td>
-          <td><span class="mode-na">&mdash;</span></td>
-          <td><span class="badge off" id="lightBadge">OFF</span></td>
-          <td><button class="btn btn-on" onclick="setLight('on')">ON</button></td>
-          <td><button class="btn btn-off" onclick="setLight('off')">OFF</button></td></tr>
       </table>
     </div>
 
@@ -293,22 +288,38 @@
           <tr><td>Turn Interval</td><td id="turnCurrent">--</td>
             <td><input type="number" id="turnIntervalInput" step="5" min="15" max="1440"></td>
             <td><button class="btn btn-save" onclick="saveTurnInterval()">Save</button></td></tr>
-          <tr><td>Motor run<br><span style="font-weight:400;color:#999;font-size:0.9em">timeout if limits on</span></td>
+          <tr><td>Depart timeout<br><span style="font-weight:400;color:#999;font-size:0.9em">must leave the end-stop</span></td>
+            <td id="turnDepCurrent">--</td>
+            <td><input type="number" id="turnDepInput" step="1" min="1" max="15"></td>
+            <td><button class="btn btn-save" onclick="saveTurnDepart()">Save</button></td></tr>
+          <tr><td>Travel timeout<br><span style="font-weight:400;color:#999;font-size:0.9em">must reach the far end</span></td>
+            <td id="turnTrvCurrent">--</td>
+            <td><input type="number" id="turnTrvInput" step="5" min="5" max="90"></td>
+            <td><button class="btn btn-save" onclick="saveTurnTravel()">Save</button></td></tr>
+          <tr><td>Blind run<br><span style="font-weight:400;color:#999;font-size:0.9em">used only if end-stops off</span></td>
             <td id="turnSecsCurrent">--</td>
             <td><input type="number" id="turnSecsInput" step="1" min="1" max="120"></td>
             <td><button class="btn btn-save" onclick="saveTurnSecs()">Save</button></td></tr>
-          <tr><td>Limit switches</td>
+          <tr><td>End-stops</td>
             <td><span class="badge off" id="turnLimitsBadge">OFF</span></td>
             <td colspan="2">
               <button class="btn btn-on" onclick="setTurnLimits('on')">Use</button>
               <button class="btn btn-off" onclick="setTurnLimits('off')">Ignore</button></td></tr>
         </table>
         <button class="turn-now-btn" onclick="turnEggsNow()">Turn Eggs Now</button>
-        <!-- The turner is a ~5s pulse, not a latched output. The device pushes
-             on both edges of that pulse, so this badge does briefly show
-             RUNNING - it is the only remote confirmation that a turn happened. -->
+        <!-- A turn is brief and not a latched output. The device pushes on both
+             the start and stop edges, so this badge does briefly show RUNNING -
+             it is the only remote confirmation that a turn actually happened. -->
         <div style="text-align:center;margin-top:10px;font-size:0.9em;color:#555">
           Turner motor: <span class="badge off" id="turnerBadge">OFF</span>
+          <span style="color:#777;font-size:0.9em">&nbsp;next: <b id="nextTurnDir">--</b></span>
+        </div>
+        <!-- Measured travel time. Worth surfacing rather than only logging: it
+             is how the travel timeout gets tuned from real data, and a figure
+             creeping upward is the earliest warning that the chain is
+             stretching or a bearing is drying out. -->
+        <div style="text-align:center;margin-top:6px;font-size:0.85em;color:#777">
+          Last travel: <span id="turnTravelMs">--</span> &nbsp;·&nbsp; peak <span id="turnTravelMax">--</span>
         </div>
         <!-- Ticked forward locally between pushes so it counts up smoothly,
              but re-anchored to the DEVICE clock on every snapshot - the browser
@@ -317,6 +328,13 @@
           Last turn: <span id="sinceTurn">--</span>
         </div>
         <div style="text-align:center;margin-top:6px;font-size:0.85em;color:#c62828;font-weight:600" id="turnerFaultMsg"></div>
+        <!-- A turner fault LATCHES and blocks further turns - see the firmware's
+             turnerFault comment for why retrying a failed end-stop unattended is
+             how a motor winding burns. This is the only way to release it
+             remotely, so it stays hidden until there is actually a fault. -->
+        <div style="text-align:center;margin-top:8px" id="turnerClearWrap" hidden>
+          <button class="btn btn-off" onclick="clearTurnerFault()">Clear Turner Fault</button>
+        </div>
       </div>
       <div class="hatcher-note" id="eggTurningNA" style="display:none;">Not applicable in Hatcher Mode &mdash; eggs are not turned during hatching.</div>
     </div>
@@ -429,7 +447,6 @@
     setBadge('humidStatusBadge', !!data.humidifierOn);
     setModeBadge('fanModeBadge', !!data.fanManualOverride);
     setBadge('fanStatusBadge', !!data.fanOn);
-    setBadge('lightBadge', !!data.lightOn);
 
     // Heater 2 has three meaningful states, not two: DISABLED (not
     // participating), STANDBY (enabled but the thermostat isn't calling for
@@ -490,8 +507,16 @@
     setBadge('turnLimitsBadge', !!data.turnerLimitsEnabled);
     $('turnLimitsBadge').textContent = data.turnerLimitsEnabled ? 'IN USE' : 'OFF';
     $('turnSecsCurrent').textContent = (data.turnerRunSeconds ?? 5) + ' s';
+    $('turnDepCurrent').textContent = (data.turnerDepartSeconds ?? 3) + ' s';
+    $('turnTrvCurrent').textContent = (data.turnerTravelSeconds ?? 30) + ' s';
+    $('nextTurnDir').textContent = data.nextTurnDir || '--';
+    $('turnTravelMs').textContent = data.turnerLastTravelMs ? (data.turnerLastTravelMs / 1000).toFixed(1) + ' s' : '--';
+    $('turnTravelMax').textContent = data.turnerMaxTravelMs ? (data.turnerMaxTravelMs / 1000).toFixed(1) + ' s' : '--';
+    $('turnerClearWrap').hidden = !(data.turnerFault && data.turnerFault.length);
     if (document.activeElement !== $('turnSecsInput')) {
       $('turnSecsInput').value = data.turnerRunSeconds ?? 5;
+      $('turnDepInput').value = data.turnerDepartSeconds ?? 3;
+      $('turnTrvInput').value = data.turnerTravelSeconds ?? 30;
     }
     $('turnerFaultMsg').textContent = data.turnerFault || '';
 
@@ -595,16 +620,40 @@
     }
   };
 
-  // Enables/disables the second heating element. Deliberately NOT a direct
-  // relay command: the device drives OT2 as (heater2Enabled && heaterOn), so
-  // the thermostat and the DHT fail-safe still govern when it energizes. There
-  // is no way from here to force an unthermostatted element on over the eggs.
+  // Blind run time - only used when the end-stops are switched off. With them
+  // on, a turn ends on ARRIVAL and this value is ignored entirely.
   window.saveTurnSecs = async function () {
     try {
       await setDoc(stateDocRef, {
         turnerRunSeconds: parseInt($('turnSecsInput').value, 10)
       }, { merge: true });
-      $('syncNote').textContent = 'Turner motor run time saved';
+      $('syncNote').textContent = 'Blind run time saved';
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  // The two timeouts. Both are FIELD-adjustable on purpose: the right values are
+  // properties of this particular chain, tray and gearing, and no first guess is
+  // ever right. Tune the travel timeout to roughly 2x the measured travel time
+  // shown on the panel above.
+  window.saveTurnDepart = async function () {
+    try {
+      await setDoc(stateDocRef, {
+        turnerDepartSeconds: parseInt($('turnDepInput').value, 10)
+      }, { merge: true });
+      $('syncNote').textContent = 'Depart timeout saved';
+    } catch (e) {
+      $('syncNote').textContent = 'Update failed: ' + e.message;
+    }
+  };
+
+  window.saveTurnTravel = async function () {
+    try {
+      await setDoc(stateDocRef, {
+        turnerTravelSeconds: parseInt($('turnTrvInput').value, 10)
+      }, { merge: true });
+      $('syncNote').textContent = 'Travel timeout saved';
     } catch (e) {
       $('syncNote').textContent = 'Update failed: ' + e.message;
     }
@@ -613,7 +662,7 @@
   window.setTurnLimits = async function (state) {
     try {
       await setDoc(stateDocRef, { turnerLimitsEnabled: state === 'on' }, { merge: true });
-      $('syncNote').textContent = 'Limit switches ' + (state === 'on' ? 'in use' : 'ignored');
+      $('syncNote').textContent = 'End-stops ' + (state === 'on' ? 'in use' : 'ignored');
     } catch (e) {
       $('syncNote').textContent = 'Update failed: ' + e.message;
     }
@@ -670,9 +719,14 @@
     }
   };
 
-  window.setLight = async function (state) {
+  // Releases a LATCHED turner fault. Written as a request flag rather than by
+  // clearing turnerFault directly: the device owns that string, and the device
+  // acknowledges this flag back to false once it has acted - the same handshake
+  // manualTurnRequest and startCycleRequest already use.
+  window.clearTurnerFault = async function () {
     try {
-      await setDoc(stateDocRef, { lightOn: state === 'on' }, { merge: true });
+      await setDoc(stateDocRef, { clearTurnerFaultRequest: true }, { merge: true });
+      $('syncNote').textContent = 'Clearing turner fault...';
     } catch (e) {
       $('syncNote').textContent = 'Update failed: ' + e.message;
     }
