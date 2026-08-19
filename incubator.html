@@ -544,23 +544,10 @@
           <tr><td>Turn Interval</td><td id="turnCurrent">--</td>
             <td><input type="number" id="turnIntervalInput" step="5" min="15" max="1440"></td>
             <td><button class="btn btn-save" onclick="saveTurnInterval()">Save</button></td></tr>
-          <tr><td>Depart timeout<br><span style="font-weight:400;color:#999;font-size:0.9em">must leave the end-stop</span></td>
-            <td id="turnDepCurrent">--</td>
-            <td><input type="number" id="turnDepInput" step="1" min="1" max="15"></td>
-            <td><button class="btn btn-save" onclick="saveTurnDepart()">Save</button></td></tr>
-          <tr><td>Travel timeout<br><span style="font-weight:400;color:#999;font-size:0.9em">must reach the far end</span></td>
-            <td id="turnTrvCurrent">--</td>
-            <td><input type="number" id="turnTrvInput" step="5" min="5" max="90"></td>
-            <td><button class="btn btn-save" onclick="saveTurnTravel()">Save</button></td></tr>
-          <tr><td>Blind run<br><span style="font-weight:400;color:#999;font-size:0.9em">used only if end-stops off</span></td>
+          <tr><td>Turn run time<br><span style="font-weight:400;color:#999;font-size:0.9em">set to ~2x measured travel</span></td>
             <td id="turnSecsCurrent">--</td>
             <td><input type="number" id="turnSecsInput" step="1" min="1" max="120"></td>
             <td><button class="btn btn-save" onclick="saveTurnSecs()">Save</button></td></tr>
-          <tr><td>End-stops</td>
-            <td><span class="badge off" id="turnLimitsBadge">OFF</span></td>
-            <td colspan="2">
-              <button class="btn btn-on" onclick="setTurnLimits('on')">Use</button>
-              <button class="btn btn-off" onclick="setTurnLimits('off')">Ignore</button></td></tr>
         </table>
         <button class="turn-now-btn" onclick="turnEggsNow()">Turn Eggs Now</button>
         <!-- A turn is brief and not a latched output. The device pushes on both
@@ -570,35 +557,11 @@
           Turner motor: <span class="badge off" id="turnerBadge">OFF</span>
           <span style="color:#777;font-size:0.9em">&nbsp;next: <b id="nextTurnDir">--</b></span>
         </div>
-        <!-- Measured travel time. Worth surfacing rather than only logging: it
-             is how the travel timeout gets tuned from real data, and a figure
-             creeping upward is the earliest warning that the chain is
-             stretching or a bearing is drying out. -->
-        <div style="text-align:center;margin-top:6px;font-size:0.85em;color:#777">
-          Last travel: <span id="turnTravelMs">--</span> &nbsp;·&nbsp; peak <span id="turnTravelMax">--</span>
-        </div>
         <!-- Ticked forward locally between pushes so it counts up smoothly,
              but re-anchored to the DEVICE clock on every snapshot - the browser
              clock is never used, so any skew between the two is irrelevant. -->
         <div style="text-align:center;margin-top:6px;font-size:0.85em;color:#777">
           Last turn: <span id="sinceTurn">--</span>
-        </div>
-        <div style="text-align:center;margin-top:6px;font-size:0.85em;color:#c62828;font-weight:600" id="turnerFaultMsg"></div>
-        <!-- A turner fault LATCHES and blocks further turns - see the firmware's
-             turnerFault comment for why retrying a failed end-stop unattended is
-             how a motor winding burns. This is the only way to release it
-             remotely, so it stays hidden until there is actually a fault. -->
-        <div style="text-align:center;margin-top:8px" id="turnerClearWrap" hidden>
-          <button class="btn btn-off" onclick="clearTurnerFault()">Clear Turner Fault</button>
-          <!-- Keeps the eggs turning when the END-STOP is what failed rather than
-               the mechanism. Runs blind timed turns, because waiting on a switch
-               that is under suspicion would just re-fault immediately. Safe
-               because each motor's normally-closed end-stop is wired in SERIES
-               with it: that contact still breaks the motor circuit in copper,
-               with no firmware involved. This waives the sensing and the
-               timeout. It cannot waive the hardware stop. -->
-          <button class="btn btn-on" style="margin-left:6px" onclick="setTurnerOverride('on')">TURN ANYWAY</button>
-          <div id="turnerOvrState" style="font-size:0.78em; color:#a3690a; font-weight:700; margin-top:6px"></div>
         </div>
       </div>
       <div class="hatcher-note" id="eggTurningNA" style="display:none;">Not applicable in Hatcher Mode &mdash; eggs are not turned during hatching.</div>
@@ -741,7 +704,7 @@
   window.mKey = mKey;
 
   function renderMimic(d) {
-    const fault = !!(d.turnerFault && d.turnerFault.length);
+    const fault = false;   // the turner has no detectable fault state any more
     const urgent = !!d.alarmUrgent;
 
     // Cabinet outline carries the urgent alarm, so a fault registers even when
@@ -912,11 +875,6 @@
       ? 'Dry-run block bypassed - humidifier will run regardless of the float switch'
       : 'Humidifier is inhibited when empty';
 
-    const tOvr = !!data.turnerFaultOverride;
-    $('turnerOvrState').textContent = tOvr
-      ? ('TURNING BLIND - ' + (data.turnerOverrideMinsLeft ?? '--') + ' min left. Hardware end-stops still active.')
-      : '';
-
     // Alarm banner. Urgent conditions are red; everything else amber, because
     // a page where every warning looks identical trains you to ignore all of them.
     const ar = data.alarmReason || '';
@@ -937,22 +895,12 @@
     setBadge('turnerBadge', !!data.turnerOn);
     $('turnerBadge').textContent = data.turnerOn ? 'RUNNING' : 'OFF';
 
-    setBadge('turnLimitsBadge', !!data.turnerLimitsEnabled);
-    $('turnLimitsBadge').textContent = data.turnerLimitsEnabled ? 'IN USE' : 'OFF';
     $('turnSecsCurrent').textContent = (data.turnerRunSeconds ?? 5) + ' s';
-    $('turnDepCurrent').textContent = (data.turnerDepartSeconds ?? 3) + ' s';
-    $('turnTrvCurrent').textContent = (data.turnerTravelSeconds ?? 30) + ' s';
     $('nextTurnDir').textContent = data.nextTurnDir || '--';
     $('netName').textContent = data.network || '--';
-    $('turnTravelMs').textContent = data.turnerLastTravelMs ? (data.turnerLastTravelMs / 1000).toFixed(1) + ' s' : '--';
-    $('turnTravelMax').textContent = data.turnerMaxTravelMs ? (data.turnerMaxTravelMs / 1000).toFixed(1) + ' s' : '--';
-    $('turnerClearWrap').hidden = !(data.turnerFault && data.turnerFault.length);
     if (document.activeElement !== $('turnSecsInput')) {
       $('turnSecsInput').value = data.turnerRunSeconds ?? 5;
-      $('turnDepInput').value = data.turnerDepartSeconds ?? 3;
-      $('turnTrvInput').value = data.turnerTravelSeconds ?? 30;
     }
-    $('turnerFaultMsg').textContent = data.turnerFault || '';
 
     // Anchor the elapsed counter to the device's own clock, then let the local
     // ticker carry it between snapshots.
@@ -1071,37 +1019,6 @@
   // properties of this particular chain, tray and gearing, and no first guess is
   // ever right. Tune the travel timeout to roughly 2x the measured travel time
   // shown on the panel above.
-  window.saveTurnDepart = async function () {
-    try {
-      await setDoc(stateDocRef, {
-        turnerDepartSeconds: parseInt($('turnDepInput').value, 10)
-      }, { merge: true });
-      $('syncNote').textContent = 'Depart timeout saved';
-    } catch (e) {
-      $('syncNote').textContent = 'Update failed: ' + e.message;
-    }
-  };
-
-  window.saveTurnTravel = async function () {
-    try {
-      await setDoc(stateDocRef, {
-        turnerTravelSeconds: parseInt($('turnTrvInput').value, 10)
-      }, { merge: true });
-      $('syncNote').textContent = 'Travel timeout saved';
-    } catch (e) {
-      $('syncNote').textContent = 'Update failed: ' + e.message;
-    }
-  };
-
-  window.setTurnLimits = async function (state) {
-    try {
-      await setDoc(stateDocRef, { turnerLimitsEnabled: state === 'on' }, { merge: true });
-      $('syncNote').textContent = 'End-stops ' + (state === 'on' ? 'in use' : 'ignored');
-    } catch (e) {
-      $('syncNote').textContent = 'Update failed: ' + e.message;
-    }
-  };
-
   window.saveBoosterDelay = async function () {
     try {
       await setDoc(stateDocRef, {
@@ -1135,13 +1052,6 @@
     } catch (e) { $('syncNote').textContent = 'Update failed: ' + e.message; }
   };
 
-  window.setTurnerOverride = async function (state) {
-    try {
-      await setDoc(stateDocRef, { turnerFaultOverride: state === 'on' }, { merge: true });
-      $('syncNote').textContent = state === 'on' ? 'Turner override requested...' : 'Clearing turner override...';
-    } catch (e) { $('syncNote').textContent = 'Update failed: ' + e.message; }
-  };
-
   window.setSensorOverride = async function (state) {
     if (state === 'on' && !confirm(
         'Override the sensor fail-safe?\n\n' +
@@ -1170,21 +1080,6 @@
     }
   };
 
-  // Releases a LATCHED turner fault. Written as a request flag rather than by
-  // clearing turnerFault directly: the device owns that string, and the device
-  // acknowledges this flag back to false once it has acted - the same handshake
-  // manualTurnRequest and startCycleRequest already use.
-  window.clearTurnerFault = async function () {
-    try {
-      await setDoc(stateDocRef, { clearTurnerFaultRequest: true }, { merge: true });
-      $('syncNote').textContent = 'Clearing turner fault...';
-    } catch (e) {
-      $('syncNote').textContent = 'Update failed: ' + e.message;
-    }
-  };
-
-  // mode: 'incubator' | 'hatcher' - device applies that egg type's reference
-  // temp/humidity defaults for that phase and restarts its cycle day-count at Day 1.
   window.setOperationMode = async function (mode) {
     try {
       await setDoc(stateDocRef, { operationMode: mode }, { merge: true });
