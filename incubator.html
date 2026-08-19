@@ -263,124 +263,151 @@
       <h3>Incubator</h3>
       <div class="mimicWrap">
       <svg class="mimic" viewBox="0 0 520 470" role="img"
-           aria-label="Schematic of the incubator cabinet showing live status of the fan, egg tray and its two turner motors, both heaters, the humidifier and its reservoir, and the two temperature sensors.">
+           aria-label="Schematic of the incubator cabinet showing live status of the fan, two egg trays and their turner motors, both heaters, the humidifier and its reservoir, and the two temperature sensors.">
 
         <!-- cabinet shell. Outline turns red on an urgent alarm, so a fault is
              visible even if the specific faulted item is off-screen on a phone -->
         <rect id="mFrame" class="ln off" x="40" y="20" width="440" height="430" rx="14" stroke-width="3"/>
         <rect x="40" y="20" width="440" height="430" rx="14" fill="#fbfcfd" opacity=".55"/>
-        <line x1="40" y1="72" x2="480" y2="72" stroke="#dfe5ea" stroke-width="1.5"/>
+        <line x1="40" y1="78" x2="480" y2="78" stroke="#dfe5ea" stroke-width="1.5"/>
         <line x1="40" y1="380" x2="480" y2="380" stroke="#dfe5ea" stroke-width="1.5"/>
 
-        <!-- ---------- circulation fan ---------- -->
+        <!-- ---------- top band: cycle day, with the fan pushed to the corner ---------- -->
+        <text class="mVal" id="mDayTxt" x="58" y="54" style="font-size:14px">&#8212;</text>
         <g class="hit" tabindex="0" role="button" aria-label="Fan status - open fan control"
            onclick="mJump('fanModeBadge')" onkeydown="mKey(event,'fanModeBadge')">
-          <circle cx="260" cy="46" r="19" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
+          <rect x="392" y="24" width="80" height="50" fill="transparent"/>
+          <text class="mLbl" x="396" y="53">Fan</text>
+          <circle cx="440" cy="49" r="19" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
           <g id="mFan" class="spin">
-            <path class="eq off" stroke-width="1.5" d="M260,32 q7,9 0,14 q-7,-5 0,-14 Z"/>
-            <path class="eq off" stroke-width="1.5" d="M274,46 q-9,7 -14,0 q5,-7 14,0 Z"/>
-            <path class="eq off" stroke-width="1.5" d="M260,60 q-7,-9 0,-14 q7,5 0,14 Z"/>
-            <path class="eq off" stroke-width="1.5" d="M246,46 q9,-7 14,0 q-5,7 -14,0 Z"/>
+            <path class="eq off" stroke-width="1.5" d="M440,35 q7,9 0,14 q-7,-5 0,-14 Z"/>
+            <path class="eq off" stroke-width="1.5" d="M454,49 q-9,7 -14,0 q5,-7 14,0 Z"/>
+            <path class="eq off" stroke-width="1.5" d="M440,63 q-7,-9 0,-14 q7,5 0,14 Z"/>
+            <path class="eq off" stroke-width="1.5" d="M426,49 q9,-7 14,0 q-5,7 -14,0 Z"/>
           </g>
-          <circle cx="260" cy="46" r="3" fill="#90a4ae"/>
+          <circle cx="440" cy="49" r="3" fill="#90a4ae"/>
         </g>
-        <text class="mLbl" x="288" y="50">Fan</text>
 
-        <!-- ---------- turner motors + chain (left wall) ---------- -->
+        <!-- ---------- readouts: humidity left, temperature right beside the probes ---------- -->
+        <text class="mLbl" x="70" y="106">HUMIDITY</text>
+        <text class="mVal" id="mHumTxt" x="70" y="132" style="font-size:23px">&#8212;</text>
+        <text class="mLbl" x="278" y="106">TEMPERATURE</text>
+        <text class="mVal" id="mTempTxt" x="278" y="132" style="font-size:23px">&#8212;</text>
+
+        <!-- ---------- turner motors + chain, pulled in against the trays ---------- -->
         <g class="hit" tabindex="0" role="button" aria-label="Egg turner status - open egg-turning controls"
            onclick="mJump('eggTurningControls')" onkeydown="mKey(event,'eggTurningControls')">
-        <rect x="66" y="142" width="66" height="170" fill="transparent"/>
-        <rect x="74" y="150" width="46" height="120" rx="8" fill="none" stroke="#dfe5ea" stroke-width="1.5"/>
+        <rect x="90" y="150" width="62" height="170" fill="transparent"/>
+        <rect x="98" y="158" width="48" height="124" rx="8" fill="none" stroke="#dfe5ea" stroke-width="1.5"/>
         <path id="mChain" class="ln off" stroke-width="2.5" stroke-dasharray="5 4"
-              d="M85,178 L85,242 M109,178 L109,242"/>
-        <g>
-          <circle cx="97" cy="178" r="15" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
-          <g id="mMotA" class="spin slow">
-            <path class="eq off" stroke-width="1.5" d="M97,166 L100,178 L97,190 L94,178 Z"/>
-            <path class="eq off" stroke-width="1.5" d="M85,178 L97,175 L109,178 L97,181 Z"/>
-          </g>
+              d="M110,186 L110,254 M134,186 L134,254"/>
+        <circle cx="122" cy="186" r="15" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
+        <g id="mMotA" class="spin slow">
+          <path class="eq off" stroke-width="1.5" d="M122,174 L125,186 L122,198 L119,186 Z"/>
+          <path class="eq off" stroke-width="1.5" d="M110,186 L122,183 L134,186 L122,189 Z"/>
         </g>
-        <g>
-          <circle cx="97" cy="242" r="15" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
-          <g id="mMotB" class="spin slow">
-            <path class="eq off" stroke-width="1.5" d="M97,230 L100,242 L97,254 L94,242 Z"/>
-            <path class="eq off" stroke-width="1.5" d="M85,242 L97,239 L109,242 L97,245 Z"/>
-          </g>
+        <circle cx="122" cy="254" r="15" fill="#fff" stroke="#cfd8dc" stroke-width="1.5"/>
+        <g id="mMotB" class="spin slow">
+          <path class="eq off" stroke-width="1.5" d="M122,242 L125,254 L122,266 L119,254 Z"/>
+          <path class="eq off" stroke-width="1.5" d="M110,254 L122,251 L134,254 L122,257 Z"/>
         </g>
-        <text class="mLbl" x="72" y="288">Turner</text>
-        <text class="mLbl" id="mTurnDir" x="72" y="302">CW / CCW</text>
+        <text class="mLbl" x="96" y="300">Turner</text>
+        <text class="mLbl" id="mTurnDir" x="96" y="314">&#8212;</text>
         </g>
 
-        <!-- ---------- egg tray ---------- -->
+        <!-- ---------- two egg trays, tilting together on one carrier ---------- -->
         <g id="mTray" class="tray tiltA">
-          <rect x="152" y="192" width="220" height="30" rx="5" fill="#fff" stroke="#b0bec5" stroke-width="2"/>
+          <rect x="158" y="170" width="212" height="26" rx="5" fill="#fff" stroke="#b0bec5" stroke-width="2"/>
           <g fill="#e8d8b8" stroke="#c9b48a" stroke-width="1.2">
-            <ellipse cx="176" cy="207" rx="8" ry="10"/><ellipse cx="200" cy="207" rx="8" ry="10"/>
-            <ellipse cx="224" cy="207" rx="8" ry="10"/><ellipse cx="248" cy="207" rx="8" ry="10"/>
-            <ellipse cx="272" cy="207" rx="8" ry="10"/><ellipse cx="296" cy="207" rx="8" ry="10"/>
-            <ellipse cx="320" cy="207" rx="8" ry="10"/><ellipse cx="344" cy="207" rx="8" ry="10"/>
+            <ellipse cx="180" cy="183" rx="7" ry="9"/><ellipse cx="204" cy="183" rx="7" ry="9"/>
+            <ellipse cx="228" cy="183" rx="7" ry="9"/><ellipse cx="252" cy="183" rx="7" ry="9"/>
+            <ellipse cx="276" cy="183" rx="7" ry="9"/><ellipse cx="300" cy="183" rx="7" ry="9"/>
+            <ellipse cx="324" cy="183" rx="7" ry="9"/><ellipse cx="348" cy="183" rx="7" ry="9"/>
           </g>
+          <rect x="158" y="212" width="212" height="26" rx="5" fill="#fff" stroke="#b0bec5" stroke-width="2"/>
+          <g fill="#e8d8b8" stroke="#c9b48a" stroke-width="1.2">
+            <ellipse cx="180" cy="225" rx="7" ry="9"/><ellipse cx="204" cy="225" rx="7" ry="9"/>
+            <ellipse cx="228" cy="225" rx="7" ry="9"/><ellipse cx="252" cy="225" rx="7" ry="9"/>
+            <ellipse cx="276" cy="225" rx="7" ry="9"/><ellipse cx="300" cy="225" rx="7" ry="9"/>
+            <ellipse cx="324" cy="225" rx="7" ry="9"/><ellipse cx="348" cy="225" rx="7" ry="9"/>
+          </g>
+          <!-- carrier spine, so the two read as one assembly that tilts together -->
+          <line x1="264" y1="196" x2="264" y2="212" stroke="#b0bec5" stroke-width="2"/>
         </g>
-        <path d="M262,232 L262,246" stroke="#cfd8dc" stroke-width="2"/>
-        <path d="M244,246 L280,246" stroke="#cfd8dc" stroke-width="3" stroke-linecap="round"/>
+        <path d="M264,248 L264,262" stroke="#cfd8dc" stroke-width="2"/>
+        <path d="M246,262 L282,262" stroke="#cfd8dc" stroke-width="3" stroke-linecap="round"/>
 
-        <!-- ---------- sensors (right wall) ---------- -->
+        <!-- ---------- sensors, drawn as thermometers ---------- -->
         <g class="hit" tabindex="0" role="button" aria-label="Primary sensor status - open sensor status"
            onclick="mJump('sensorBadge')" onkeydown="mKey(event,'sensorBadge')">
-          <rect id="mSenP" class="eq off" x="424" y="150" width="16" height="30" rx="3" stroke-width="1.5"/>
-          <line x1="432" y1="180" x2="432" y2="196" stroke="#cfd8dc" stroke-width="1.5"/>
-          <text class="mLbl" x="398" y="146">TEM1</text>
+          <rect x="396" y="142" width="70" height="66" fill="transparent"/>
+          <text class="mLbl" x="418" y="152" text-anchor="end">TEM1</text>
+          <g id="mSenP">
+            <rect class="eq off" x="428" y="146" width="10" height="34" rx="5" stroke-width="1.5"/>
+            <circle class="eq off" cx="433" cy="188" r="9" stroke-width="1.5"/>
+          </g>
         </g>
         <g class="hit" tabindex="0" role="button" aria-label="Backup sensor status - open sensor status"
            onclick="mJump('sensorBadge')" onkeydown="mKey(event,'sensorBadge')">
-          <rect id="mSenB" class="eq off" x="424" y="220" width="16" height="30" rx="3" stroke-width="1.5"/>
-          <line x1="432" y1="250" x2="432" y2="266" stroke="#cfd8dc" stroke-width="1.5"/>
-          <text class="mLbl" x="398" y="216">TEM2</text>
+          <rect x="396" y="212" width="70" height="66" fill="transparent"/>
+          <text class="mLbl" x="418" y="222" text-anchor="end">TEM2</text>
+          <g id="mSenB">
+            <rect class="eq off" x="428" y="216" width="10" height="34" rx="5" stroke-width="1.5"/>
+            <circle class="eq off" cx="433" cy="258" r="9" stroke-width="1.5"/>
+          </g>
         </g>
 
         <!-- ---------- heaters ---------- -->
         <g class="hit" tabindex="0" role="button" aria-label="Heater 1 status - open heater control"
            onclick="mJump('heaterModeBadge')" onkeydown="mKey(event,'heaterModeBadge')">
-          <rect x="112" y="298" width="250" height="34" fill="transparent"/>
+          <rect x="168" y="296" width="240" height="32" fill="transparent"/>
           <path id="mHt1" class="ln off" stroke-width="4" stroke-linecap="round"
-                d="M120,318 l14,-11 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-11"/>
-          <text class="mLbl" x="310" y="322">Heater 1</text>
+                d="M176,314 l13,-11 l13,22 l13,-22 l13,22 l13,-22 l13,22 l13,-22 l13,22 l13,-22 l13,22 l13,-11"/>
+          <text class="mLbl" x="336" y="318">Heater 1</text>
         </g>
         <g class="hit" tabindex="0" role="button" aria-label="Heater 2 status - open booster control"
            onclick="mJump('heater2StatusBadge')" onkeydown="mKey(event,'heater2StatusBadge')">
-          <rect x="112" y="336" width="250" height="34" fill="transparent"/>
+          <rect x="168" y="332" width="240" height="32" fill="transparent"/>
           <path id="mHt2" class="ln off" stroke-width="4" stroke-linecap="round"
-                d="M120,356 l14,-11 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-22 l14,22 l14,-11"/>
-          <text class="mLbl" x="310" y="360">Heater 2</text>
+                d="M176,350 l13,-11 l13,22 l13,-22 l13,22 l13,-22 l13,22 l13,-22 l13,22 l13,-22 l13,22 l13,-11"/>
+          <text class="mLbl" x="336" y="354">Heater 2</text>
         </g>
 
-        <!-- ---------- humidifier + reservoir ---------- -->
+        <!-- ---------- humidifier, drawn as a mister ---------- -->
         <g class="hit" tabindex="0" role="button" aria-label="Humidifier status - open humidifier control"
            onclick="mJump('humidModeBadge')" onkeydown="mKey(event,'humidModeBadge')">
-          <circle class="mist d0" cx="112" cy="410" r="6" fill="#81d4fa"/>
-          <circle class="mist d1" cx="124" cy="410" r="5" fill="#81d4fa"/>
-          <circle class="mist d2" cx="100" cy="410" r="4" fill="#81d4fa"/>
-          <rect id="mHumid" class="eq off" x="92" y="412" width="40" height="24" rx="4" stroke-width="1.5"/>
-          <text class="mLbl" x="140" y="429">Humidifier</text>
-        </g>
-        <g class="hit" tabindex="0" role="button" aria-label="Reservoir level - open reservoir status"
-           onclick="mJump('waterBadge')" onkeydown="mKey(event,'waterBadge')">
-          <rect id="mTank" x="360" y="398" width="76" height="40" rx="4" fill="#fff" stroke="#b0bec5" stroke-width="1.5"/>
-          <rect id="mWater" x="362" y="414" width="72" height="22" rx="3" fill="#4fc3f7"/>
-          <text class="mLbl" id="mWaterLbl" x="360" y="392">Reservoir</text>
+          <rect x="86" y="386" width="120" height="56" fill="transparent"/>
+          <circle class="mist d0" cx="116" cy="400" r="5.5" fill="#81d4fa"/>
+          <circle class="mist d1" cx="104" cy="398" r="4" fill="#81d4fa"/>
+          <circle class="mist d2" cx="128" cy="396" r="3.5" fill="#81d4fa"/>
+          <g id="mHumid">
+            <path class="eq off" stroke-width="1.5" d="M110,420 L122,420 L118,406 L114,406 Z"/>
+            <rect class="eq off" x="94" y="420" width="44" height="18" rx="3" stroke-width="1.5"/>
+          </g>
+          <text class="mLbl" x="146" y="434">Humidifier</text>
         </g>
 
-        <!-- ---------- readouts ---------- -->
-        <text class="mLbl" x="152" y="104">TEMPERATURE</text>
-        <text class="mVal" id="mTempTxt" x="152" y="128" style="font-size:22px">--</text>
-        <text class="mLbl" x="290" y="104">HUMIDITY</text>
-        <text class="mVal" id="mHumTxt" x="290" y="128" style="font-size:22px">--</text>
-        <text class="mLbl" id="mDayTxt" x="60" y="104">--</text>
+        <!-- ---------- reservoir ---------- -->
+        <g class="hit" tabindex="0" role="button" aria-label="Reservoir level - open reservoir status"
+           onclick="mJump('waterBadge')" onkeydown="mKey(event,'waterBadge')">
+          <rect x="352" y="384" width="96" height="60" fill="transparent"/>
+          <rect id="mTank" x="360" y="400" width="76" height="38" rx="4" fill="#fff" stroke="#b0bec5" stroke-width="1.5"/>
+          <rect id="mWater" x="362" y="416" width="72" height="20" rx="3" fill="#4fc3f7"/>
+          <text class="mLbl" id="mWaterLbl" x="360" y="394">Reservoir</text>
+        </g>
       </svg>
       </div>
-      <div style="text-align:center;margin-top:6px;font-size:0.75em;color:#78909c">
-Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault<br>
-        <span style="opacity:.8">Tap any item to jump to its controls</span>
+      <!-- Legend text carries the colour it describes: reading "Red = fault" in
+           plain grey makes the reader map word to swatch themselves, which is
+           exactly the work a legend exists to remove. -->
+      <div style="text-align:center;margin-top:8px;font-size:0.75em">
+        <span style="color:#8a949c;font-weight:600">Grey = off</span>
+        <span style="color:#cfd8dc">&nbsp;&middot;&nbsp;</span>
+        <span style="color:#2e7d32;font-weight:600">Green = running</span>
+        <span style="color:#cfd8dc">&nbsp;&middot;&nbsp;</span>
+        <span style="color:#c62828;font-weight:600">Red = fault</span>
+        <br>
+        <span style="color:#90a4ae">Tap any item to jump to its controls</span>
       </div>
     </div>
 
@@ -733,7 +760,7 @@ Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault<br>
     // Humidifier. A dry reservoir is a fault on the humidifier itself, because
     // that is the thing the operator has to act on - the firmware blocks the
     // mister outright when waterOk is false, with no override.
-    setEq('mHumid', (d.waterOk === false) ? 'fault' : (d.humidifierOn ? 'on' : 'off'));
+    setEqTree('mHumid', (d.waterOk === false) ? 'fault' : (d.humidifierOn ? 'on' : 'off'));
     const misting = !!d.humidifierOn && d.waterOk !== false;
     const humEl = $('mHumid');
     if (humEl && humEl.parentNode) {
@@ -758,8 +785,8 @@ Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault<br>
     // a different fact from "both fine", and it should be visible at a glance
     // rather than buried in a status string.
     const act = d.activeSensor;
-    setEq('mSenP', d.primaryOk === false ? 'fault' : (act === 'primary' ? 'on' : 'off'));
-    setEq('mSenB', d.backupOk === false ? 'fault' : (act === 'backup' ? 'on' : 'off'));
+    setEqTree('mSenP', d.primaryOk === false ? 'fault' : (act === 'primary' ? 'on' : 'off'));
+    setEqTree('mSenB', d.backupOk === false ? 'fault' : (act === 'backup' ? 'on' : 'off'));
 
     // Turner. Direction-aware: the two motors are physically opposite, so only
     // the one being driven spins, and it spins the correct way.
@@ -796,8 +823,9 @@ Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault<br>
       (typeof d.temperature === 'number' && d.dhtOk !== false) ? d.temperature.toFixed(1) + '\u00B0C' : '--';
     if ($('mHumTxt')) $('mHumTxt').textContent =
       (typeof d.humidity === 'number' && d.dhtOk !== false) ? Math.round(d.humidity) + '%' : '--';
-    if ($('mDayTxt')) $('mDayTxt').textContent =
-      d.cycleActive ? ('DAY ' + (d.cycleDay ?? '?')) : 'NOT STARTED';
+    if ($('mDayTxt')) $('mDayTxt').textContent = d.cycleActive
+      ? ('Incubation Day ' + (d.cycleDay ?? '?') + ' of ' + (d.cycleDurationDays ?? '?'))
+      : 'No cycle running';
   }
 
   function renderState(data) {
