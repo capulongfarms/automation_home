@@ -477,7 +477,19 @@ Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault<br>
         <tr><td>Reservoir</td>
           <td><span class="mode-na">float switch</span></td>
           <td><span class="badge off" id="waterBadge">--</span></td>
-          <td colspan="2" style="font-size:0.78em; color:#888">Humidifier is inhibited when empty</td></tr>
+          <td colspan="2" style="font-size:0.78em; color:#888" id="waterNote">Humidifier is inhibited when empty</td></tr>
+        <!-- Hidden until the tank actually reads empty. A float switch can lie -
+             stuck float, broken wire, corroded contact - and without this the
+             humidifier would be unusable for the rest of the batch on the word
+             of one failed contact. Deliberately NOT offered pre-emptively: the
+             device refuses to arm it while the tank reads full. -->
+        <tr id="waterOvrRow" hidden><td colspan="5" style="background:#fff3e0; border-radius:8px; padding:8px 10px">
+          <span style="color:#a3690a; font-weight:700; font-size:0.85em">Float switch wrong?</span>
+          <span style="font-size:0.8em; color:#666"> Bypass lets the humidifier run. <b>Check the tank by eye first</b> &mdash; a mister run dry destroys itself in minutes.</span>
+          <span id="waterOvrState" style="font-size:0.8em; font-weight:700; margin-left:6px"></span>
+          <button class="btn btn-on" style="margin-left:6px" onclick="setWaterOverride('on')">BYPASS</button>
+          <button class="btn btn-off" style="margin-left:6px" onclick="setWaterOverride('off')">RESTORE</button>
+        </td></tr>
         <tr><td>Humidifier</td>
           <td><button class="mode-badge auto" id="humidModeBadge" onclick="setMode('Humidifier','auto')">AUTO</button></td>
           <td><span class="badge off" id="humidStatusBadge">OFF</span></td>
@@ -552,6 +564,15 @@ Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault<br>
              remotely, so it stays hidden until there is actually a fault. -->
         <div style="text-align:center;margin-top:8px" id="turnerClearWrap" hidden>
           <button class="btn btn-off" onclick="clearTurnerFault()">Clear Turner Fault</button>
+          <!-- Keeps the eggs turning when the END-STOP is what failed rather than
+               the mechanism. Runs blind timed turns, because waiting on a switch
+               that is under suspicion would just re-fault immediately. Safe
+               because each motor's normally-closed end-stop is wired in SERIES
+               with it: that contact still breaks the motor circuit in copper,
+               with no firmware involved. This waives the sensing and the
+               timeout. It cannot waive the hardware stop. -->
+          <button class="btn btn-on" style="margin-left:6px" onclick="setTurnerOverride('on')">TURN ANYWAY</button>
+          <div id="turnerOvrState" style="font-size:0.78em; color:#a3690a; font-weight:700; margin-top:6px"></div>
         </div>
       </div>
       <div class="hatcher-note" id="eggTurningNA" style="display:none;">Not applicable in Hatcher Mode &mdash; eggs are not turned during hatching.</div>
@@ -847,6 +868,25 @@ Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault<br>
     $('waterBadge').className = 'badge ' + (wOk ? 'on' : 'off');
     $('waterBadge').style.background = wOk ? '' : '#c62828';
 
+    // The bypass row only exists while there is something to bypass - the device
+    // refuses to arm it otherwise, so offering it would be a dead button.
+    const wOvr = !!data.waterFailOverride;
+    $('waterOvrRow').hidden = wOk && !wOvr;
+    $('waterOvrState').textContent = wOvr ? ('BYPASSED - ' + (data.waterOverrideMinsLeft ?? '--') + ' min left') : '';
+    $('waterOvrState').style.color = wOvr ? '#c62828' : '';
+    if (wOvr) {
+      $('waterBadge').textContent = 'BYPASSED';
+      $('waterBadge').style.background = '#a3690a';
+    }
+    $('waterNote').textContent = wOvr
+      ? 'Dry-run block bypassed - humidifier will run regardless of the float switch'
+      : 'Humidifier is inhibited when empty';
+
+    const tOvr = !!data.turnerFaultOverride;
+    $('turnerOvrState').textContent = tOvr
+      ? ('TURNING BLIND - ' + (data.turnerOverrideMinsLeft ?? '--') + ' min left. Hardware end-stops still active.')
+      : '';
+
     // Alarm banner. Urgent conditions are red; everything else amber, because
     // a page where every warning looks identical trains you to ignore all of them.
     const ar = data.alarmReason || '';
@@ -1053,6 +1093,23 @@ Grey = off &nbsp;·&nbsp; Green = running &nbsp;·&nbsp; Red = fault<br>
     } catch (e) {
       $('syncNote').textContent = 'Update failed: ' + e.message;
     }
+  };
+
+  // Both routed through the device's own setters, which refuse to arm when
+  // there is nothing to override - the guard lives in firmware, not here, so a
+  // stale page or a hand-written Firestore write cannot bypass it.
+  window.setWaterOverride = async function (state) {
+    try {
+      await setDoc(stateDocRef, { waterFailOverride: state === 'on' }, { merge: true });
+      $('syncNote').textContent = state === 'on' ? 'Dry-run bypass requested...' : 'Restoring dry-run block...';
+    } catch (e) { $('syncNote').textContent = 'Update failed: ' + e.message; }
+  };
+
+  window.setTurnerOverride = async function (state) {
+    try {
+      await setDoc(stateDocRef, { turnerFaultOverride: state === 'on' }, { merge: true });
+      $('syncNote').textContent = state === 'on' ? 'Turner override requested...' : 'Clearing turner override...';
+    } catch (e) { $('syncNote').textContent = 'Update failed: ' + e.message; }
   };
 
   window.setSensorOverride = async function (state) {
