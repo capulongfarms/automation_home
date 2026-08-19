@@ -260,7 +260,6 @@
          up close. Both are wanted, which is why this sits above them rather
          than replacing them. -->
     <div class="group groupM">
-      <h3>Incubator</h3>
       <div class="mimicWrap">
       <svg class="mimic" viewBox="0 0 520 470" role="img"
            aria-label="Schematic of the incubator cabinet showing live status of the fan, two egg trays and their turner motors, both heaters, the humidifier and its reservoir, and the two temperature sensors.">
@@ -823,8 +822,11 @@
       (typeof d.temperature === 'number' && d.dhtOk !== false) ? d.temperature.toFixed(1) + '\u00B0C' : '--';
     if ($('mHumTxt')) $('mHumTxt').textContent =
       (typeof d.humidity === 'number' && d.dhtOk !== false) ? Math.round(d.humidity) + '%' : '--';
+    // Carries the MODE as well as the day, which is why the panel needs no
+    // heading of its own - "Hatching Day 1 of 3" says both.
     if ($('mDayTxt')) $('mDayTxt').textContent = d.cycleActive
-      ? ('Incubation Day ' + (d.cycleDay ?? '?') + ' of ' + (d.cycleDurationDays ?? '?'))
+      ? ((d.operationMode === 'hatcher' ? 'Hatching Day ' : 'Incubation Day ')
+         + (d.cycleDay ?? '?') + ' of ' + (d.cycleDurationDays ?? '?'))
       : 'No cycle running';
   }
 
