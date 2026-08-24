@@ -464,7 +464,7 @@
            are then the last values Firestore received, NOT live ones — and the
            same failed read has already forced the heater and humidifier off. -->
       <div id="sensorFaultMsg" style="display:none; background:#fdecea; color:#c62828; border-left:5px solid #c62828; padding:10px 12px; border-radius:6px; margin-bottom:10px; font-size:0.85em; font-weight:600">
-        SENSOR FAULT — DHT11 not reading.<br>
+        SENSOR FAULT — no usable sensor reading.<br>
         <span style="font-weight:400">Values below are the last known reading, not live. Heater and humidifier are forced OFF by the safety fail-safe until the sensor recovers.</span>
         <div style="margin-top:8px; font-weight:400">
           If a batch is under way, you can override the fail-safe and run the heater
@@ -490,14 +490,14 @@
         </div>
       </div>
       <table>
-        <tr><th></th><th>Reading</th><th>Set Value</th><th></th></tr>
-        <tr><td>Temperature</td><td id="tempReadout">--</td>
+        <tr><th></th><th id="thTem1">TEM1</th><th id="thTem2">TEM2</th><th>Set Value</th><th></th></tr>
+        <tr><td>Temperature</td><td id="tem1Temp">--</td><td id="tem2Temp">--</td>
           <td><input type="number" id="targetTempInput" step="0.1" min="20" max="45"></td>
           <td><button class="btn btn-save" onclick="saveTemp()">Save</button></td></tr>
-        <tr><td>Humidity</td><td id="humReadout">--</td>
+        <tr><td>Humidity</td><td id="tem1Hum">--</td><td id="tem2Hum">--</td>
           <td><input type="number" id="targetHumInput" step="1" min="20" max="90"></td>
           <td><button class="btn btn-save" onclick="saveHum()">Save</button></td></tr>
-        <tr><td>Booster delay</td><td id="boosterDelayCurrent">--</td>
+        <tr><td>Booster delay</td><td id="boosterDelayCurrent" colspan="2">--</td>
           <td><input type="number" id="boosterDelayInput" step="1" min="1" max="120"></td>
           <td><button class="btn btn-save" onclick="saveBoosterDelay()">Save</button></td></tr>
       </table>
@@ -842,10 +842,32 @@
     // Mark them unmistakably instead of quietly displaying stale data.
     const sensorOk = data.dhtOk !== false;
     const overridden = data.sensorFailOverride === true;
-    $('tempReadout').innerHTML = (typeof data.temperature === 'number' ? data.temperature.toFixed(1) : '--') + ' &deg;C';
-    $('humReadout').textContent = (typeof data.humidity === 'number' ? data.humidity.toFixed(0) : '--') + ' %';
-    $('tempReadout').style.opacity = sensorOk ? '1' : '0.45';
-    $('humReadout').style.opacity  = sensorOk ? '1' : '0.45';
+    // Both sensors, each in its own column. data.temperature/.humidity are the
+    // ACTIVE sensor's values and are deliberately NOT used here - showing the
+    // active pair in both columns would misreport whichever sensor is standby.
+    const cTemp = (t) => (typeof t === 'number' && !isNaN(t)) ? t.toFixed(1) + ' \u00B0C' : '--';
+    const cHum  = (h) => (typeof h === 'number' && !isNaN(h)) ? h.toFixed(0) + ' %' : '--';
+    $('tem1Temp').textContent = cTemp(data.primaryTemp);
+    $('tem1Hum').textContent  = cHum(data.primaryHum);
+    $('tem2Temp').textContent = cTemp(data.backupTemp);
+    $('tem2Hum').textContent  = cHum(data.backupHum);
+
+    // Dimmed per sensor, not from one shared flag: with a redundant pair, one
+    // failing while the other reads fine is the normal case, and greying both
+    // would hide precisely what the second sensor is there to show.
+    const dimPair = (ids, ok) => ids.forEach(i => { $(i).style.opacity = ok ? '1' : '0.45'; });
+    dimPair(['tem1Temp', 'tem1Hum'], data.primaryOk !== false);
+    dimPair(['tem2Temp', 'tem2Hum'], data.backupOk  !== false);
+
+    // Which column the thermostat is actually acting on. Two plausible readings
+    // side by side otherwise leave it ambiguous which one is in charge.
+    $('thTem1').innerHTML = 'TEM1' + (data.activeSensor === 'primary'
+      ? ' <span style="color:#2e7d32">&#9679; ACTIVE</span>' : '');
+    $('thTem2').innerHTML = 'TEM2' + (data.activeSensor === 'backup'
+      ? ' <span style="color:#2e7d32">&#9679; ACTIVE</span>' : '');
+
+
+
 
     // The two banners are mutually exclusive. Showing the fault banner's
     // OVERRIDE button while already overridden would invite arming it twice;
