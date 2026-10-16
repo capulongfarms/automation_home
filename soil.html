@@ -123,6 +123,13 @@
   th { background: #6d4c41; color: #fff; font-weight: 700; position: sticky; top: 0; }
   td.num { text-align: right; font-variant-numeric: tabular-nums; }
   td.soft { color: #999; }
+  /* N/P/K: laboratory-entered only, never produced by the probe. Pushed to the
+     last three columns and tinted so they read as a separate, sparse block
+     rather than as part of the measured run. */
+  th.lab { background: #4e342e; font-weight: 600; }
+  td.lab { color: #7d7d7d; background: rgba(0, 0, 0, .025); text-align: right;
+           font-variant-numeric: tabular-nums; }
+  .labnote { color: #8a8a8a; font-size: 12px; }
   tr:last-child td { border-bottom: none; }
   .empty { padding: 26px; text-align: center; color: #999; font-size: 0.9em; }
 
@@ -226,8 +233,8 @@
               <tr>
                 <th>Taken</th><th>Plot</th><th>Src</th>
                 <th>Moist %</th><th>Temp &deg;C</th><th>EC</th>
-                <th>pH</th><th>N</th><th>P</th><th>K</th>
-                <th>Salin</th><th>Fert</th><th>Synced</th>
+                <th>pH</th><th>Salin</th><th>Fert</th><th>Synced</th>
+                <th class="lab">N</th><th class="lab">P</th><th class="lab">K</th>
               </tr>
             </thead>
             <tbody id="tbody"></tbody>
@@ -265,14 +272,25 @@
           <div class="field"><label>pH</label><input type="number" step="0.01" id="aPh"></div>
         </div>
         <div class="form" style="margin-top:10px">
-          <div class="field"><label>N mg/kg &mdash; lab only</label><input type="number" step="1" id="aN"></div>
-          <div class="field"><label>P mg/kg &mdash; lab only</label><input type="number" step="1" id="aP"></div>
-          <div class="field"><label>K mg/kg &mdash; lab only</label><input type="number" step="1" id="aK"></div>
           <div class="field"><label>Salinity mg/L</label><input type="number" step="1" id="aSal"></div>
           <div class="field"><label>Fertility 0&ndash;100</label><input type="number" step="1" id="aFert"></div>
         </div>
         <div class="form" style="margin-top:10px">
           <div class="field" style="flex:1 1 100%"><label>Note</label><input type="text" id="aNote" placeholder="Optional &mdash; depth, weather, which corner of the plot"></div>
+        </div>
+        <!-- N/P/K sit LAST and apart on purpose. The probe cannot measure them -
+             it derives them from conductivity - so the only way a figure gets in
+             here is from a soil laboratory. Keeping them beside moisture and pH
+             implied they came from the same place. -->
+        <div style="margin-top:16px; padding-top:12px; border-top:1px solid rgba(255,255,255,.12)">
+          <div class="labnote" style="margin-bottom:8px">
+            Laboratory results only &mdash; the probe does not measure N, P or K
+          </div>
+          <div class="form">
+            <div class="field"><label>N mg/kg</label><input type="number" step="1" id="aN"></div>
+            <div class="field"><label>P mg/kg</label><input type="number" step="1" id="aP"></div>
+            <div class="field"><label>K mg/kg</label><input type="number" step="1" id="aK"></div>
+          </div>
         </div>
         <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap">
           <button class="act" id="aSave" onclick="saveManual()">Save reading</button>
@@ -630,19 +648,19 @@ readingId = "&lt;deviceId&gt;-&lt;takenAt&gt;-&lt;seq&gt;"
         <td class="num">${fmt(r.temp, 1)}</td>
         <td class="num">${fmt(r.ec, 0)}</td>
         <td class="num soft">${fmt(r.ph, 2)}</td>
-        <td class="num soft">${fmt(r.n, 0)}</td>
-        <td class="num soft">${fmt(r.p, 0)}</td>
-        <td class="num soft">${fmt(r.k, 0)}</td>
         <td class="num soft">${fmt(r.salinity, 0)}</td>
         <td class="num soft">${fmt(r.fertility, 0)}</td>
         <td><span class="badge ${lag.cls}">${esc(lag.text)}</span></td>
+        <td class="num lab">${fmt(r.n, 0)}</td>
+        <td class="num lab">${fmt(r.p, 0)}</td>
+        <td class="num lab">${fmt(r.k, 0)}</td>
       </tr>`;
     }).join("");
   };
 
   /* ---------------- CSV export ---------------- */
   const CSV_COLS = ["takenAt", "takenAtIso", "plot", "source", "moisture", "temp", "ec",
-                    "ph", "n", "p", "k", "salinity", "fertility", "note"];
+                    "ph", "salinity", "fertility", "note", "n", "p", "k"];
 
   window.exportCsv = function () {
     const list = filtered();
