@@ -265,10 +265,10 @@
           <div class="field"><label>pH</label><input type="number" step="0.01" id="aPh"></div>
         </div>
         <div class="form" style="margin-top:10px">
-          <div class="field"><label>N mg/kg</label><input type="number" step="1" id="aN"></div>
-          <div class="field"><label>P mg/kg</label><input type="number" step="1" id="aP"></div>
-          <div class="field"><label>K mg/kg</label><input type="number" step="1" id="aK"></div>
-          <div class="field"><label>Salinity mg/kg</label><input type="number" step="1" id="aSal"></div>
+          <div class="field"><label>N mg/kg &mdash; lab only</label><input type="number" step="1" id="aN"></div>
+          <div class="field"><label>P mg/kg &mdash; lab only</label><input type="number" step="1" id="aP"></div>
+          <div class="field"><label>K mg/kg &mdash; lab only</label><input type="number" step="1" id="aK"></div>
+          <div class="field"><label>Salinity mg/L</label><input type="number" step="1" id="aSal"></div>
           <div class="field"><label>Fertility 0&ndash;100</label><input type="number" step="1" id="aFert"></div>
         </div>
         <div class="form" style="margin-top:10px">
@@ -560,10 +560,14 @@ readingId = "&lt;deviceId&gt;-&lt;takenAt&gt;-&lt;seq&gt;"
     ["ec",       "EC",       "\u00B5S/cm", 0, false],
     ["ph",       "pH",       "",       2, true],
     ["salinity", "SALINITY", "mg/L",   0, true],
-    ["n",        "N",        "mg/kg",  0, true],
-    ["p",        "P",        "mg/kg",  0, true],
-    ["k",        "K",        "mg/kg",  0, true],
     ["fertility","FERTILITY","",       0, true]
+    // N, P and K are deliberately NOT tiles. The probe never reports them -
+    // it derives them from bulk conductivity, proven on hardware by adding
+    // table salt (no N, P or K) and watching all three climb to the same
+    // clamped value. The firmware refuses to read those registers, so a tile
+    // here could only ever show a dash, which reads as "not measured yet"
+    // rather than "never". Lab results still have a home: the manual-entry
+    // form below, and the n/p/k columns in the CSV export.
   ];
 
   function renderLatest() {
