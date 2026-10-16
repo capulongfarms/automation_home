@@ -1,0 +1,967 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Soil Tester</title>
+<style>
+  body {
+    font-family: Arial, sans-serif;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    min-height: 100vh;
+    margin: 0;
+    padding: 24px 16px;
+    box-sizing: border-box;
+    background-color: #f0f0f0;
+    color: #222;
+  }
+  h2 { color: #333; margin: 0 0 8px; }
+  .subtitle { color: #777; font-size: 0.9em; margin-bottom: 20px; text-align: center; }
+
+  /* ---------- Login screen ---------- */
+  #loginScreen {
+    background: white;
+    padding: 32px 28px;
+    border-radius: 12px;
+    box-shadow: 0 2px 10px rgba(0,0,0,0.1);
+    width: 100%;
+    max-width: 320px;
+    box-sizing: border-box;
+    text-align: center;
+  }
+  #loginScreen input {
+    width: 100%; padding: 12px; margin: 8px 0;
+    border: 1px solid #ddd; border-radius: 6px; box-sizing: border-box; font-size: 1em;
+  }
+  #loginScreen button {
+    width: 100%; padding: 12px; margin-top: 8px; border: none; border-radius: 6px;
+    background-color: #6d4c41; color: white; font-size: 1em; cursor: pointer;
+  }
+  #loginScreen button:hover { background-color: #5d4037; }
+  #loginError { color: #d32f2f; font-size: 0.85em; margin-top: 10px; min-height: 1.2em; }
+
+  /* ---------- Control screen ---------- */
+  #controlScreen { display: none; width: 100%; max-width: 860px; box-sizing: border-box; }
+  #userEmail { color: #888; font-size: 0.8em; text-align: center; margin-bottom: 14px; }
+
+  /* ---------- Tabs ---------- */
+  .tabs { display: flex; gap: 8px; margin-bottom: 18px; flex-wrap: wrap; }
+  .tab {
+    flex: 1; min-width: 110px; padding: 12px 10px; border: none; border-radius: 10px;
+    background: #e2e5e8; color: #666; font-size: 0.92em; font-weight: 700;
+    cursor: pointer; display: flex; align-items: center; justify-content: center; gap: 8px;
+    transition: background 0.15s, color 0.15s;
+  }
+  .tab.active { background: #fff; color: #222; box-shadow: 0 2px 8px rgba(0,0,0,0.1); }
+  .tab .dot { width: 9px; height: 9px; border-radius: 50%; background: #bbb; flex: none; }
+  .tab .dot.ok { background: #0d7a5f; }
+  .tab .dot.warn { background: #ef6c00; }
+  .tab .dot.bad { background: #c62828; }
+
+  .panel { display: none; }
+  .panel.active { display: block; }
+
+  .group { border-radius: 14px; padding: 16px 18px; margin-bottom: 16px; box-shadow: 0 2px 10px rgba(0,0,0,0.06); }
+  .group h3 { margin: 0 0 12px; font-size: 1em; }
+  .group-soil   { background: #f3ede7; } .group-soil h3   { color: #6d4c41; }
+  .group-latest { background: #eafaf0; } .group-latest h3 { color: #0d7a5f; }
+  .group-dev    { background: #eaf3ff; } .group-dev h3    { color: #1565c0; }
+  .group-plots  { background: #fff6e3; } .group-plots h3  { color: #a3690a; }
+  .group-warn   { background: #fdeceb; } .group-warn h3   { color: #c62828; }
+
+  .row { display: flex; justify-content: space-between; align-items: center; padding: 7px 0; border-bottom: 1px solid rgba(0,0,0,0.06); font-size: 0.9em; gap: 10px; }
+  .row:last-child { border-bottom: none; }
+  .row > span:first-child { font-weight: 600; color: #444; }
+
+  .badge { padding: 4px 10px; border-radius: 12px; color: white; font-weight: 700; font-size: 0.72em; white-space: nowrap; }
+  .badge.on { background-color: #0d7a5f; }
+  .badge.off { background-color: #999; }
+  .badge.alm { background-color: #c62828; }
+  .badge.blue { background-color: #1565c0; }
+  .badge.amber { background-color: #ef6c00; }
+  .badge.soil { background-color: #6d4c41; }
+
+  button.act {
+    padding: 10px 16px; border: none; border-radius: 8px; background: #6d4c41;
+    color: white; font-size: 0.9em; font-weight: 600; cursor: pointer;
+  }
+  button.act:hover { background: #5d4037; }
+  button.act.ghost { background: #e2e5e8; color: #555; }
+  button.act.ghost:hover { background: #d4d8dc; }
+  button.act:disabled { background: #ccc; cursor: not-allowed; }
+
+  /* ---------- Latest reading tiles ---------- */
+  /* Grid, not flex: a trailing row of one or two tiles must stay the same
+     width as the rest instead of stretching across the card. */
+  .tiles { display: grid; grid-template-columns: repeat(auto-fill, minmax(112px, 1fr)); gap: 10px; }
+  .tile {
+    background: #fff; border-radius: 10px; padding: 12px 14px;
+    box-sizing: border-box;
+  }
+  .tile .lbl { font-size: 0.7em; color: #888; font-weight: 700; letter-spacing: 0.4px; }
+  .tile .val { font-size: 1.45em; font-weight: 700; color: #222; margin-top: 3px; }
+  .tile .unit { font-size: 0.55em; color: #999; font-weight: 600; margin-left: 2px; }
+  .tile.soft .val { color: #8a8a8a; }
+  .tile.soft .lbl::after { content: " \2248"; color: #b58a00; }
+
+  .legend { font-size: 0.75em; color: #777; margin-top: 10px; line-height: 1.5; }
+
+  /* ---------- Filters + table ---------- */
+  .filters { display: flex; gap: 8px; flex-wrap: wrap; margin-bottom: 12px; }
+  .filters select, .filters input {
+    padding: 9px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.85em;
+    background: #fff; box-sizing: border-box;
+  }
+  .filters input[type="date"] { min-width: 140px; }
+  .filters input[type="search"] { flex: 1; min-width: 140px; }
+
+  .tablewrap { overflow-x: auto; background: #fff; border-radius: 10px; }
+  table { border-collapse: collapse; width: 100%; font-size: 0.82em; }
+  th, td { padding: 9px 10px; text-align: left; border-bottom: 1px solid #eee; white-space: nowrap; }
+  th { background: #6d4c41; color: #fff; font-weight: 700; position: sticky; top: 0; }
+  td.num { text-align: right; font-variant-numeric: tabular-nums; }
+  td.soft { color: #999; }
+  tr:last-child td { border-bottom: none; }
+  .empty { padding: 26px; text-align: center; color: #999; font-size: 0.9em; }
+
+  .srcpill { padding: 2px 7px; border-radius: 9px; font-size: 0.85em; font-weight: 700; }
+  .srcpill.esp32  { background: #e3f1ea; color: #0d7a5f; }
+  .srcpill.manual { background: #f3ede7; color: #6d4c41; }
+  .srcpill.import { background: #eaf3ff; color: #1565c0; }
+
+  /* ---------- Form ---------- */
+  .form { display: flex; flex-wrap: wrap; gap: 10px; }
+  .field { display: flex; flex-direction: column; flex: 1 1 130px; min-width: 120px; }
+  .field label { font-size: 0.72em; color: #666; font-weight: 700; margin-bottom: 4px; }
+  .field input, .field select, .field textarea {
+    padding: 9px 10px; border: 1px solid #ddd; border-radius: 6px; font-size: 0.9em;
+    box-sizing: border-box; width: 100%; font-family: inherit;
+  }
+  .formnote { font-size: 0.78em; color: #777; margin-top: 10px; line-height: 1.5; }
+  .formmsg { font-size: 0.85em; margin-top: 10px; min-height: 1.2em; }
+  .formmsg.ok  { color: #0d7a5f; }
+  .formmsg.err { color: #c62828; }
+
+  .chiplist { display: flex; flex-wrap: wrap; gap: 6px; margin-bottom: 10px; }
+  .chip {
+    background: #fff; border-radius: 14px; padding: 5px 10px; font-size: 0.8em;
+    display: flex; align-items: center; gap: 7px;
+  }
+  .chip button { border: none; background: none; color: #c62828; cursor: pointer; font-size: 1.05em; line-height: 1; padding: 0; }
+
+  details { margin-top: 10px; }
+  summary { cursor: pointer; font-size: 0.85em; color: #6d4c41; font-weight: 700; }
+  details pre {
+    background: #2b2b2b; color: #e6e6e6; padding: 12px; border-radius: 8px;
+    font-size: 0.72em; overflow-x: auto; line-height: 1.5;
+  }
+
+  .homelink {
+    align-self: flex-start; margin-bottom: 14px; text-decoration: none;
+    background: rgba(255,255,255,0.75); color: #444; padding: 7px 13px; border-radius: 8px;
+    font-size: 0.85em; font-weight: 600; transition: background 0.15s, color 0.15s;
+  }
+  .homelink:hover { background: #fff; color: #222; }
+</style>
+</head>
+<body>
+
+  <a class="homelink" href="index.html">&larr; Home</a>
+
+  <div id="loginScreen">
+    <h2>Soil Tester</h2>
+    <div class="subtitle">Sign in to view soil test results</div>
+    <input type="email" id="emailInput" placeholder="Email" autocomplete="username">
+    <input type="password" id="passwordInput" placeholder="Password" autocomplete="current-password">
+    <button onclick="signIn()">Sign In</button>
+    <div id="loginError"></div>
+  </div>
+
+  <div id="controlScreen">
+    <div id="userEmail"></div>
+
+    <div class="tabs">
+      <button class="tab active" id="tabReadings" onclick="showTab('readings')"><span class="dot" id="dotReadings"></span>Readings</button>
+      <button class="tab" id="tabAdd"    onclick="showTab('add')">Add</button>
+      <button class="tab" id="tabPlots"  onclick="showTab('plots')">Plots</button>
+      <button class="tab" id="tabDevice" onclick="showTab('device')"><span class="dot" id="dotDevice"></span>Device</button>
+    </div>
+
+    <!-- ============ READINGS ============ -->
+    <div class="panel active" id="panelReadings">
+
+      <div class="group group-latest">
+        <h3>Latest reading &mdash; <span id="latestWhere">no data yet</span></h3>
+        <div class="tiles" id="latestTiles">
+          <div class="empty" style="width:100%">Waiting for the first soil test.</div>
+        </div>
+        <div class="legend">
+          Moisture, temperature and EC are measured directly. Values marked &#8776; (pH, N, P, K,
+          salinity, fertility) are derived from bulk EC by the probe's own model &mdash; treat them as
+          indicative and comparative, not as laboratory figures.
+        </div>
+      </div>
+
+      <div class="group group-soil">
+        <h3>Test history</h3>
+        <div class="filters">
+          <select id="fPlot" onchange="renderTable()"><option value="">All plots</option></select>
+          <select id="fSource" onchange="renderTable()">
+            <option value="">All sources</option>
+            <option value="esp32">Device</option>
+            <option value="manual">Manual</option>
+            <option value="import">Import</option>
+          </select>
+          <input type="date" id="fFrom" onchange="renderTable()" title="From date">
+          <input type="date" id="fTo"   onchange="renderTable()" title="To date">
+          <input type="search" id="fText" oninput="renderTable()" placeholder="Search plot or note">
+          <button class="act ghost" onclick="clearFilters()">Clear</button>
+          <button class="act" onclick="exportCsv()">Export CSV</button>
+        </div>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Taken</th><th>Plot</th><th>Src</th>
+                <th>Moist %</th><th>Temp &deg;C</th><th>EC</th>
+                <th>pH</th><th>N</th><th>P</th><th>K</th>
+                <th>Salin</th><th>Fert</th><th>Synced</th>
+              </tr>
+            </thead>
+            <tbody id="tbody"></tbody>
+          </table>
+        </div>
+        <div class="row" style="margin-top:10px">
+          <span>Showing</span>
+          <span id="countNote" class="badge soil">0 readings</span>
+        </div>
+        <div class="row">
+          <span>Duplicates suppressed</span>
+          <span id="dupNote" class="badge off">0</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ ADD ============ -->
+    <div class="panel" id="panelAdd">
+      <div class="group group-soil">
+        <h3>Record a test by hand</h3>
+        <div class="form">
+          <div class="field" style="flex:1 1 180px">
+            <label>Plot</label>
+            <select id="aPlot"></select>
+          </div>
+          <div class="field" style="flex:1 1 200px">
+            <label>Date &amp; time taken</label>
+            <input type="datetime-local" id="aWhen">
+          </div>
+        </div>
+        <div class="form" style="margin-top:10px">
+          <div class="field"><label>Moisture %</label><input type="number" step="0.1" id="aMoist"></div>
+          <div class="field"><label>Temp &deg;C</label><input type="number" step="0.1" id="aTemp"></div>
+          <div class="field"><label>EC &micro;S/cm</label><input type="number" step="1" id="aEc"></div>
+          <div class="field"><label>pH</label><input type="number" step="0.01" id="aPh"></div>
+        </div>
+        <div class="form" style="margin-top:10px">
+          <div class="field"><label>N mg/kg</label><input type="number" step="1" id="aN"></div>
+          <div class="field"><label>P mg/kg</label><input type="number" step="1" id="aP"></div>
+          <div class="field"><label>K mg/kg</label><input type="number" step="1" id="aK"></div>
+          <div class="field"><label>Salinity mg/kg</label><input type="number" step="1" id="aSal"></div>
+          <div class="field"><label>Fertility 0&ndash;100</label><input type="number" step="1" id="aFert"></div>
+        </div>
+        <div class="form" style="margin-top:10px">
+          <div class="field" style="flex:1 1 100%"><label>Note</label><input type="text" id="aNote" placeholder="Optional &mdash; depth, weather, which corner of the plot"></div>
+        </div>
+        <div style="margin-top:14px; display:flex; gap:8px; flex-wrap:wrap">
+          <button class="act" id="aSave" onclick="saveManual()">Save reading</button>
+          <button class="act ghost" onclick="resetManual()">Reset</button>
+        </div>
+        <div class="formmsg" id="aMsg"></div>
+        <div class="formnote">
+          The fallback path: for a sample taken before the field unit was built, a reading the unit
+          failed to capture, or a correction to one it got wrong.
+          The reading's identity is <em>plot + timestamp</em> &mdash; saving the same plot and minute twice
+          corrects the existing record instead of creating a second one.
+        </div>
+      </div>
+
+      <div class="group group-dev">
+        <h3>Import a CSV</h3>
+        <input type="file" id="csvFile" accept=".csv,text/csv">
+        <div style="margin-top:12px; display:flex; gap:8px; flex-wrap:wrap">
+          <button class="act" id="csvBtn" onclick="importCsv()" disabled>Import</button>
+        </div>
+        <div class="formmsg" id="csvMsg"></div>
+        <div class="formnote">
+          For backfilling a batch of readings, or restoring from an export.
+          Expected columns (header row required, extra columns ignored):
+          <code>takenAt, plot, moisture, temp, ec, ph, n, p, k, salinity, fertility, note</code>.
+          <code>takenAt</code> accepts <code>YYYY-MM-DD HH:MM</code> or an epoch in seconds.
+          Rows that already exist are skipped, not duplicated.
+        </div>
+      </div>
+    </div>
+
+    <!-- ============ PLOTS ============ -->
+    <div class="panel" id="panelPlots">
+      <div class="group group-plots">
+        <h3>Plots</h3>
+        <div class="chiplist" id="plotChips"></div>
+        <div class="form">
+          <div class="field" style="flex:1 1 200px">
+            <label>Add a plot</label>
+            <input type="text" id="newPlot" placeholder="e.g. North Paddy">
+          </div>
+          <div class="field" style="flex:0 0 auto; justify-content:flex-end">
+            <button class="act" onclick="addPlot()">Add</button>
+          </div>
+        </div>
+        <div class="formmsg" id="plotMsg"></div>
+        <div class="formnote">
+          The plot list is stored on the device document, so the ESP32 can pull it on its next sync
+          and offer the same names on its own screen. Removing a plot here does not touch readings
+          already recorded against it.
+        </div>
+      </div>
+
+      <div class="group group-soil">
+        <h3>Per-plot summary</h3>
+        <div class="tablewrap">
+          <table>
+            <thead>
+              <tr><th>Plot</th><th>Tests</th><th>Last tested</th><th>Moist %</th><th>Temp &deg;C</th><th>EC</th><th>pH</th></tr>
+            </thead>
+            <tbody id="plotSummary"></tbody>
+          </table>
+        </div>
+        <div class="legend">Averages are over every reading held for that plot. pH is shown for reference only.</div>
+      </div>
+    </div>
+
+    <!-- ============ DEVICE ============ -->
+    <div class="panel" id="panelDevice">
+      <div class="group group-dev">
+        <h3>Field unit</h3>
+        <div class="row"><span>Status</span><span id="dStatus" class="badge off">never seen</span></div>
+        <div class="row"><span>Last sync</span><span id="dLastSeen">&mdash;</span></div>
+        <div class="row"><span>Queued on device</span><span id="dQueue" class="badge off">&mdash;</span></div>
+        <div class="row"><span>Battery</span><span id="dBatt">&mdash;</span></div>
+        <div class="row"><span>WiFi signal</span><span id="dRssi">&mdash;</span></div>
+        <div class="row"><span>Firmware</span><span id="dFw">&mdash;</span></div>
+        <div class="row"><span>Device clock drift</span><span id="dDrift">&mdash;</span></div>
+        <div class="row"><span>Uploads deduplicated</span><span id="dDup">&mdash;</span></div>
+      </div>
+
+      <div class="group group-warn">
+        <h3>Waiting on the field unit</h3>
+        <div class="formnote" style="margin-top:0">
+          The field unit runs on a <strong>Hankerila HKL-ER6-S3</strong>, which carries its own
+          RS485 transceiver, a battery-backed DS1307 clock and an OLED &mdash; so no MAX3485 or
+          DS3231 is needed. The ESP32-C3 Super Mini build is kept alongside it for a
+          pocket-sized version later. This tab fills in on the unit's first sync; until the
+          probe is wired, <strong>Add</strong> and CSV import keep the page usable.
+        </div>
+      </div>
+
+      <div class="group group-soil">
+        <h3>Data contract</h3>
+        <div class="formnote" style="margin-top:0">
+          What the ESP32 must write, once it exists. Document IDs are deterministic, which is what
+          makes re-uploading a queued reading harmless.
+        </div>
+        <details open>
+          <summary>Reading document</summary>
+<pre>path: devices/soil_tester/readings/{readingId}
+
+readingId = "&lt;deviceId&gt;-&lt;takenAt&gt;-&lt;seq&gt;"
+            e.g. "soil1-1790000123-0004"
+            seq is a counter persisted in LittleFS so it
+            survives power-off; without that, two samples
+            in the same second would collide.
+
+{
+  id:         "soil1-1790000123-0004",
+  source:     "esp32",
+  deviceId:   "soil1",
+  plot:       "North Paddy",
+  takenAt:    1790000123,        // epoch seconds, from the onboard RTC
+  uploadedAt: serverTimestamp(), // set on write, not on capture
+  moisture:   34.2,              // %
+  temp:       27.8,              // degrees C
+  ec:         420,               // uS/cm
+  ph:         6.4,
+  n:  48, p: 22, k: 130,         // mg/kg
+  salinity:   210,               // mg/kg
+  fertility:  62,                // 0-100
+  battery:    0,                 // 0 = not measured on this board
+  note:       ""
+}</pre>
+        </details>
+        <details>
+          <summary>Device document</summary>
+<pre>path: devices/soil_tester
+
+{
+  online:       true,
+  lastSeen:     serverTimestamp(),
+  queueDepth:   0,        // readings still held in LittleFS
+  dupSuppressed: 12,      // re-uploads that hit an existing id
+  battery:      0,          // not measured on the HKL
+  rssi:         -61,
+  fw:           "1.0.0",
+  deviceTime:   1790000123,  // device clock, for drift check
+  plots: ["North Paddy", "South Paddy", "Orchard"]
+}</pre>
+        </details>
+        <details>
+          <summary>Offline queue and sync rules</summary>
+<pre>1. Capture writes one JSON line to /queue.jsonl in LittleFS,
+   with its readingId already assigned.
+
+2. On WiFi, walk the file line by line and setDoc() each
+   reading at its own id. setDoc is idempotent: a reading
+   that was already uploaded simply overwrites itself with
+   identical content, so a retry can never duplicate.
+
+3. Delete a line only after its write is confirmed. A reboot
+   mid-sync re-sends a few readings; step 2 makes that safe.
+
+4. Compact /queue.jsonl once every line is confirmed, rather
+   than rewriting the file per reading.
+
+5. Never trust millis() for timestamps. takenAt comes from
+   the onboard RTC at the moment of capture, so a reading that
+   sits queued for three days still carries the time it was
+   actually taken.</pre>
+        </details>
+      </div>
+    </div>
+
+    <div style="text-align:center; margin: 8px 0 24px">
+      <button class="act ghost" onclick="signOutUser()">Sign out</button>
+    </div>
+  </div>
+
+<script type="module">
+  import { initializeApp }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
+  import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
+  import { getFirestore, doc, setDoc, onSnapshot, collection, query,
+           orderBy, limit, serverTimestamp, writeBatch }
+    from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
+
+  // Public web config - safe to expose client-side. Real access control is
+  // enforced server-side by Firestore Security Rules (restricted to specific UIDs),
+  // not by keeping this config secret.
+  const firebaseConfig = {
+    apiKey: "AIzaSyDnk7DM6Cw0P-NBUb9GeMxxaQhE6E6s9GE",
+    authDomain: "automation-home-4b86f.firebaseapp.com",
+    projectId: "automation-home-4b86f",
+    storageBucket: "automation-home-4b86f.firebasestorage.app",
+    messagingSenderId: "145747597471",
+    appId: "1:145747597471:web:08f2f8b32229191a66eaaa"
+  };
+
+  const app  = initializeApp(firebaseConfig);
+  const auth = getAuth(app);
+  const db   = getFirestore(app);
+
+  const deviceDocRef  = doc(db, "devices", "soil_tester");
+  const readingsColRef = collection(db, "devices", "soil_tester", "readings");
+
+  // How long since lastSeen before the field unit counts as offline.
+  const DEVICE_FRESH_MS = 6 * 60 * 60 * 1000;   // 6 hours - it is a carried tool, not a fixed node
+  const MAX_ROWS = 500;
+
+  const $ = id => document.getElementById(id);
+
+  let rawRows   = [];     // straight from Firestore
+  let rows      = [];     // after the dedup pass
+  let dupDropped = 0;
+  let plots     = [];
+  let deviceState = null;
+  let unsubDevice = null, unsubReadings = null;
+  let csvParsed = null;
+
+  /* ---------------- helpers ---------------- */
+
+  const numOrNull = v => {
+    if (v === "" || v === null || v === undefined) return null;
+    const n = Number(v);
+    return Number.isFinite(n) ? n : null;
+  };
+  const fmt = (v, dp) => (v === null || v === undefined) ? "\u2014" : Number(v).toFixed(dp);
+  const slug = s => String(s || "").toLowerCase().replace(/[^a-z0-9]+/g, "-").replace(/^-|-$/g, "") || "unassigned";
+  const esc = s => String(s === null || s === undefined ? "" : s)
+    .replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+
+  function fmtStamp(epochSec) {
+    if (!epochSec) return "\u2014";
+    return new Date(epochSec * 1000).toLocaleString([], {
+      year: "numeric", month: "short", day: "2-digit", hour: "2-digit", minute: "2-digit"
+    });
+  }
+  function fmtLag(takenAt, uploadedAt) {
+    if (!uploadedAt) return { text: "pending", cls: "off" };
+    const lag = uploadedAt - takenAt;
+    if (lag < 90)    return { text: "live",  cls: "on" };
+    if (lag < 3600)  return { text: Math.round(lag / 60) + " min", cls: "blue" };
+    if (lag < 86400) return { text: Math.round(lag / 3600) + " h", cls: "blue" };
+    return { text: Math.round(lag / 86400) + " d", cls: "amber" };
+  }
+
+  /* ---------------- dedup ----------------
+     Belt and braces. Document IDs are already deterministic, so Firestore
+     itself cannot hold the same reading twice. This second pass catches a
+     record written under a different id but describing the same sample -
+     same device, same plot, same minute - which is what a firmware bug or a
+     careless CSV import would produce. */
+  function dedupe(input) {
+    const seen = new Map();
+    let dropped = 0;
+    for (const r of input) {
+      const key = [r.deviceId || r.source || "?", Math.floor((r.takenAt || 0) / 60), slug(r.plot)].join("|");
+      const prev = seen.get(key);
+      if (!prev) { seen.set(key, r); continue; }
+      dropped++;
+      // Keep whichever was uploaded first; a later re-upload is the copy.
+      if ((r.uploadedAt || Infinity) < (prev.uploadedAt || Infinity)) seen.set(key, r);
+    }
+    return { rows: [...seen.values()].sort((a, b) => (b.takenAt || 0) - (a.takenAt || 0)), dropped };
+  }
+
+  /* ---------------- tabs ---------------- */
+  window.showTab = function (name) {
+    for (const t of ["readings", "add", "plots", "device"]) {
+      const cap = t.charAt(0).toUpperCase() + t.slice(1);
+      $("tab" + cap).classList.toggle("active", t === name);
+      $("panel" + cap).classList.toggle("active", t === name);
+    }
+  };
+
+  /* ---------------- auth ---------------- */
+  window.signIn = async function () {
+    $('loginError').textContent = '';
+    try {
+      await signInWithEmailAndPassword(auth, $('emailInput').value.trim(), $('passwordInput').value);
+    } catch (e) {
+      $('loginError').textContent = 'Sign-in failed: ' + e.message;
+    }
+  };
+  window.signOutUser = async function () { await signOut(auth); };
+
+  /* ---------------- latest reading ---------------- */
+  const TILES = [
+    ["moisture", "MOISTURE", "%",     1, false],
+    ["temp",     "TEMP",     "\u00B0C", 1, false],
+    ["ec",       "EC",       "\u00B5S/cm", 0, false],
+    ["ph",       "pH",       "",       2, true],
+    ["n",        "N",        "mg/kg",  0, true],
+    ["p",        "P",        "mg/kg",  0, true],
+    ["k",        "K",        "mg/kg",  0, true],
+    ["salinity", "SALINITY", "mg/kg",  0, true],
+    ["fertility","FERTILITY","",       0, true]
+  ];
+
+  function renderLatest() {
+    const r = rows[0];
+    if (!r) {
+      $('latestWhere').textContent = "no data yet";
+      $('latestTiles').innerHTML = '<div class="empty" style="width:100%">Waiting for the first soil test.</div>';
+      return;
+    }
+    $('latestWhere').textContent = (r.plot || "unassigned") + " \u00B7 " + fmtStamp(r.takenAt);
+    $('latestTiles').innerHTML = TILES.map(([k, lbl, unit, dp, soft]) => `
+      <div class="tile${soft ? ' soft' : ''}">
+        <div class="lbl">${lbl}</div>
+        <div class="val">${fmt(r[k], dp)}<span class="unit">${unit}</span></div>
+      </div>`).join("");
+  }
+
+  /* ---------------- table ---------------- */
+  window.clearFilters = function () {
+    $('fPlot').value = ""; $('fSource').value = "";
+    $('fFrom').value = ""; $('fTo').value = ""; $('fText').value = "";
+    renderTable();
+  };
+
+  function filtered() {
+    const p = $('fPlot').value, s = $('fSource').value;
+    const t = $('fText').value.trim().toLowerCase();
+    const from = $('fFrom').value ? new Date($('fFrom').value + "T00:00").getTime() / 1000 : null;
+    const to   = $('fTo').value   ? new Date($('fTo').value   + "T23:59").getTime() / 1000 : null;
+    return rows.filter(r => {
+      if (p && r.plot !== p) return false;
+      if (s && r.source !== s) return false;
+      if (from !== null && (r.takenAt || 0) < from) return false;
+      if (to   !== null && (r.takenAt || 0) > to)   return false;
+      if (t) {
+        const hay = ((r.plot || "") + " " + (r.note || "")).toLowerCase();
+        if (!hay.includes(t)) return false;
+      }
+      return true;
+    });
+  }
+
+  window.renderTable = function () {
+    const list = filtered();
+    $('countNote').textContent = list.length + (list.length === 1 ? " reading" : " readings");
+    $('dupNote').textContent = dupDropped;
+    $('dupNote').className = "badge " + (dupDropped ? "amber" : "off");
+
+    if (!list.length) {
+      $('tbody').innerHTML = '<tr><td colspan="13"><div class="empty">No readings match these filters.</div></td></tr>';
+      return;
+    }
+    $('tbody').innerHTML = list.map(r => {
+      const lag = fmtLag(r.takenAt, r.uploadedAt);
+      return `<tr>
+        <td>${esc(fmtStamp(r.takenAt))}</td>
+        <td>${esc(r.plot || "\u2014")}</td>
+        <td><span class="srcpill ${esc(r.source || 'manual')}">${esc(r.source || "manual")}</span></td>
+        <td class="num">${fmt(r.moisture, 1)}</td>
+        <td class="num">${fmt(r.temp, 1)}</td>
+        <td class="num">${fmt(r.ec, 0)}</td>
+        <td class="num soft">${fmt(r.ph, 2)}</td>
+        <td class="num soft">${fmt(r.n, 0)}</td>
+        <td class="num soft">${fmt(r.p, 0)}</td>
+        <td class="num soft">${fmt(r.k, 0)}</td>
+        <td class="num soft">${fmt(r.salinity, 0)}</td>
+        <td class="num soft">${fmt(r.fertility, 0)}</td>
+        <td><span class="badge ${lag.cls}">${esc(lag.text)}</span></td>
+      </tr>`;
+    }).join("");
+  };
+
+  /* ---------------- CSV export ---------------- */
+  const CSV_COLS = ["takenAt", "takenAtIso", "plot", "source", "moisture", "temp", "ec",
+                    "ph", "n", "p", "k", "salinity", "fertility", "note"];
+
+  window.exportCsv = function () {
+    const list = filtered();
+    if (!list.length) return;
+    const cell = v => {
+      const s = (v === null || v === undefined) ? "" : String(v);
+      return /[",\n]/.test(s) ? '"' + s.replace(/"/g, '""') + '"' : s;
+    };
+    const lines = [CSV_COLS.join(",")];
+    for (const r of list) {
+      lines.push(CSV_COLS.map(c => cell(
+        c === "takenAtIso" ? new Date((r.takenAt || 0) * 1000).toISOString() : r[c]
+      )).join(","));
+    }
+    const blob = new Blob([lines.join("\n")], { type: "text/csv;charset=utf-8" });
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(blob);
+    a.download = "soil-readings-" + new Date().toISOString().slice(0, 10) + ".csv";
+    a.click();
+    URL.revokeObjectURL(a.href);
+  };
+
+  /* ---------------- manual entry ---------------- */
+  function localInputNow() {
+    const d = new Date(Date.now() - new Date().getTimezoneOffset() * 60000);
+    return d.toISOString().slice(0, 16);
+  }
+  window.resetManual = function () {
+    for (const id of ["aMoist","aTemp","aEc","aPh","aN","aP","aK","aSal","aFert","aNote"]) $(id).value = "";
+    $('aWhen').value = localInputNow();
+    $('aMsg').textContent = "";
+  };
+
+  window.saveManual = async function () {
+    const msg = $('aMsg');
+    msg.className = "formmsg";
+    const plot = $('aPlot').value;
+    const when = $('aWhen').value;
+    if (!plot) { msg.className = "formmsg err"; msg.textContent = "Pick a plot first \u2014 add one on the Plots tab."; return; }
+    if (!when) { msg.className = "formmsg err"; msg.textContent = "Set the date and time the sample was taken."; return; }
+
+    const takenAt = Math.floor(new Date(when).getTime() / 1000);
+    const vals = {
+      moisture: numOrNull($('aMoist').value), temp: numOrNull($('aTemp').value),
+      ec: numOrNull($('aEc').value), ph: numOrNull($('aPh').value),
+      n: numOrNull($('aN').value), p: numOrNull($('aP').value), k: numOrNull($('aK').value),
+      salinity: numOrNull($('aSal').value), fertility: numOrNull($('aFert').value)
+    };
+    if (Object.values(vals).every(v => v === null)) {
+      msg.className = "formmsg err"; msg.textContent = "Enter at least one measurement."; return;
+    }
+
+    // Deterministic id: re-saving the same plot and minute corrects that
+    // reading rather than adding a second one.
+    const id = "man-" + takenAt + "-" + slug(plot);
+    $('aSave').disabled = true;
+    try {
+      await setDoc(doc(readingsColRef, id), Object.assign({
+        id, source: "manual", deviceId: "manual", plot, takenAt,
+        uploadedAt: serverTimestamp(), note: $('aNote').value.trim()
+      }, vals));
+      msg.className = "formmsg ok";
+      msg.textContent = "Saved \u2014 " + plot + " at " + fmtStamp(takenAt) + ".";
+      for (const k of ["aMoist","aTemp","aEc","aPh","aN","aP","aK","aSal","aFert","aNote"]) $(k).value = "";
+    } catch (e) {
+      msg.className = "formmsg err"; msg.textContent = "Save failed: " + e.message;
+    } finally {
+      $('aSave').disabled = false;
+    }
+  };
+
+  /* ---------------- CSV import ---------------- */
+  function parseCsv(text) {
+    // Small dependency-free parser: handles quoted fields and embedded commas.
+    const out = []; let row = []; let cur = ""; let q = false;
+    for (let i = 0; i < text.length; i++) {
+      const c = text[i];
+      if (q) {
+        if (c === '"' && text[i + 1] === '"') { cur += '"'; i++; }
+        else if (c === '"') q = false;
+        else cur += c;
+      } else if (c === '"') q = true;
+      else if (c === ",") { row.push(cur); cur = ""; }
+      else if (c === "\n") { row.push(cur); out.push(row); row = []; cur = ""; }
+      else if (c !== "\r") cur += c;
+    }
+    if (cur !== "" || row.length) { row.push(cur); out.push(row); }
+    return out.filter(r => r.some(c => c.trim() !== ""));
+  }
+
+  function parseWhen(v) {
+    const s = String(v || "").trim();
+    if (!s) return null;
+    if (/^\d{9,11}$/.test(s)) return Number(s);              // epoch seconds
+    const t = Date.parse(s.replace(" ", "T"));
+    return Number.isNaN(t) ? null : Math.floor(t / 1000);
+  }
+
+  $('csvFile').addEventListener("change", async (ev) => {
+    const f = ev.target.files[0];
+    const msg = $('csvMsg');
+    csvParsed = null; $('csvBtn').disabled = true;
+    if (!f) { msg.textContent = ""; return; }
+    try {
+      const grid = parseCsv(await f.text());
+      if (grid.length < 2) throw new Error("needs a header row and at least one data row");
+      const head = grid[0].map(h => h.trim().toLowerCase());
+      const idx = n => head.indexOf(n);
+      if (idx("takenat") === -1) throw new Error("no 'takenAt' column");
+
+      const existing = new Set(rawRows.map(r => r.id));
+      const recs = []; let bad = 0, dup = 0;
+      for (const line of grid.slice(1)) {
+        const g = n => { const i = idx(n); return i === -1 ? "" : (line[i] || "").trim(); };
+        const takenAt = parseWhen(g("takenat"));
+        const plot = g("plot") || "Unassigned";
+        if (!takenAt) { bad++; continue; }
+        const id = "imp-" + takenAt + "-" + slug(plot);
+        if (existing.has(id)) { dup++; continue; }
+        existing.add(id);
+        recs.push({
+          id, source: "import", deviceId: "import", plot, takenAt, note: g("note"),
+          moisture: numOrNull(g("moisture")), temp: numOrNull(g("temp")),
+          ec: numOrNull(g("ec")), ph: numOrNull(g("ph")),
+          n: numOrNull(g("n")), p: numOrNull(g("p")), k: numOrNull(g("k")),
+          salinity: numOrNull(g("salinity")), fertility: numOrNull(g("fertility"))
+        });
+      }
+      csvParsed = recs;
+      msg.className = "formmsg";
+      msg.textContent = `${recs.length} new, ${dup} already present, ${bad} unreadable.`;
+      $('csvBtn').disabled = recs.length === 0;
+    } catch (e) {
+      msg.className = "formmsg err";
+      msg.textContent = "Could not read that file: " + e.message;
+    }
+  });
+
+  window.importCsv = async function () {
+    if (!csvParsed || !csvParsed.length) return;
+    const msg = $('csvMsg');
+    $('csvBtn').disabled = true;
+    msg.className = "formmsg"; msg.textContent = "Importing\u2026";
+    try {
+      // Firestore caps a batch at 500 writes.
+      for (let i = 0; i < csvParsed.length; i += 400) {
+        const batch = writeBatch(db);
+        for (const r of csvParsed.slice(i, i + 400)) {
+          batch.set(doc(readingsColRef, r.id), Object.assign({}, r, { uploadedAt: serverTimestamp() }));
+        }
+        await batch.commit();
+      }
+      msg.className = "formmsg ok";
+      msg.textContent = `Imported ${csvParsed.length} readings.`;
+      csvParsed = null; $('csvFile').value = "";
+    } catch (e) {
+      msg.className = "formmsg err";
+      msg.textContent = "Import failed: " + e.message;
+      $('csvBtn').disabled = false;
+    }
+  };
+
+  /* ---------------- plots ---------------- */
+  function renderPlots() {
+    $('plotChips').innerHTML = plots.length
+      ? plots.map(p => `<span class="chip">${esc(p)}<button title="Remove" onclick="removePlot('${esc(p).replace(/'/g, "\\'")}')">&times;</button></span>`).join("")
+      : '<span style="font-size:0.85em;color:#999">No plots yet \u2014 add the first one below.</span>';
+
+    const keep = $('fPlot').value;
+    $('fPlot').innerHTML = '<option value="">All plots</option>' +
+      plots.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join("");
+    $('fPlot').value = plots.includes(keep) ? keep : "";
+
+    const keepA = $('aPlot').value;
+    $('aPlot').innerHTML = plots.length
+      ? plots.map(p => `<option value="${esc(p)}">${esc(p)}</option>`).join("")
+      : '<option value="">\u2014 add a plot first \u2014</option>';
+    if (plots.includes(keepA)) $('aPlot').value = keepA;
+  }
+
+  async function savePlots(next) {
+    const msg = $('plotMsg');
+    msg.className = "formmsg";
+    try {
+      await setDoc(deviceDocRef, { plots: next }, { merge: true });
+      msg.className = "formmsg ok"; msg.textContent = "Plot list saved.";
+    } catch (e) {
+      msg.className = "formmsg err"; msg.textContent = "Could not save: " + e.message;
+    }
+  }
+  window.addPlot = function () {
+    const v = $('newPlot').value.trim();
+    if (!v) return;
+    if (plots.includes(v)) { $('plotMsg').className = "formmsg err"; $('plotMsg').textContent = "That plot already exists."; return; }
+    $('newPlot').value = "";
+    savePlots([...plots, v]);
+  };
+  window.removePlot = function (p) {
+    if (!confirm(`Remove the plot "${p}"?\n\nReadings already recorded against it are kept.`)) return;
+    savePlots(plots.filter(x => x !== p));
+  };
+
+  function renderPlotSummary() {
+    const by = new Map();
+    for (const r of rows) {
+      const k = r.plot || "Unassigned";
+      if (!by.has(k)) by.set(k, []);
+      by.get(k).push(r);
+    }
+    if (!by.size) {
+      $('plotSummary').innerHTML = '<tr><td colspan="7"><div class="empty">No readings yet.</div></td></tr>';
+      return;
+    }
+    const avg = (list, key) => {
+      const v = list.map(r => r[key]).filter(x => x !== null && x !== undefined);
+      return v.length ? v.reduce((a, b) => a + b, 0) / v.length : null;
+    };
+    $('plotSummary').innerHTML = [...by.entries()]
+      .sort((a, b) => a[0].localeCompare(b[0]))
+      .map(([name, list]) => `<tr>
+        <td>${esc(name)}</td>
+        <td class="num">${list.length}</td>
+        <td>${esc(fmtStamp(Math.max(...list.map(r => r.takenAt || 0))))}</td>
+        <td class="num">${fmt(avg(list, "moisture"), 1)}</td>
+        <td class="num">${fmt(avg(list, "temp"), 1)}</td>
+        <td class="num">${fmt(avg(list, "ec"), 0)}</td>
+        <td class="num soft">${fmt(avg(list, "ph"), 2)}</td>
+      </tr>`).join("");
+  }
+
+  /* ---------------- device panel ---------------- */
+  function renderDevice() {
+    const d = deviceState;
+    const dot = $('dotDevice');
+    if (!d || !d.lastSeen) {
+      $('dStatus').textContent = "never seen"; $('dStatus').className = "badge off";
+      dot.className = "dot";
+      return;
+    }
+    const seenMs = d.lastSeen.toMillis ? d.lastSeen.toMillis() : 0;
+    const fresh = seenMs && (Date.now() - seenMs) < DEVICE_FRESH_MS;
+    $('dStatus').textContent = fresh ? "synced recently" : "not seen lately";
+    $('dStatus').className = "badge " + (fresh ? "on" : "amber");
+    dot.className = "dot " + (fresh ? "ok" : "warn");
+
+    $('dLastSeen').textContent = seenMs ? new Date(seenMs).toLocaleString() : "\u2014";
+    const q = d.queueDepth;
+    $('dQueue').textContent = (q === undefined || q === null) ? "\u2014" : q;
+    $('dQueue').className = "badge " + (q ? "amber" : "on");
+    // The HKL has no battery divider wired, so the firmware reports 0 rather
+    // than inventing a voltage. Say so instead of showing "0.00 V".
+    $('dBatt').textContent = (d.battery && Number(d.battery) > 0.1)
+      ? Number(d.battery).toFixed(2) + " V" : "not measured on this board";
+    $('dRssi').textContent = d.rssi ? d.rssi + " dBm" : "\u2014";
+    $('dFw').textContent   = d.fw || "\u2014";
+    $('dDup').textContent  = (d.dupSuppressed === undefined) ? "\u2014" : d.dupSuppressed;
+
+    if (d.deviceTime) {
+      const drift = Math.round(Date.now() / 1000 - d.deviceTime);
+      const a = Math.abs(drift);
+      $('dDrift').textContent = a < 60 ? drift + " s"
+        : a < 3600 ? Math.round(drift / 60) + " min"
+        : Math.round(drift / 3600) + " h";
+    } else {
+      $('dDrift').textContent = "\u2014";
+    }
+  }
+
+  function renderAll() {
+    const res = dedupe(rawRows);
+    rows = res.rows; dupDropped = res.dropped;
+    renderLatest();
+    renderTable();
+    renderPlotSummary();
+    $('dotReadings').className = "dot " + (rows.length ? "ok" : "");
+  }
+
+  /* ---------------- auth state ---------------- */
+  onAuthStateChanged(auth, (user) => {
+    if (user) {
+      $('loginScreen').style.display = 'none';
+      $('controlScreen').style.display = 'block';
+      $('userEmail').textContent = 'Signed in as ' + user.email;
+      $('aWhen').value = localInputNow();
+
+      unsubDevice = onSnapshot(deviceDocRef, (snap) => {
+        deviceState = snap.exists() ? snap.data() : null;
+        plots = (deviceState && Array.isArray(deviceState.plots)) ? deviceState.plots : [];
+        renderPlots();
+        renderDevice();
+      }, (err) => {
+        $('plotMsg').className = "formmsg err";
+        $('plotMsg').textContent = "Device sync error: " + err.message;
+      });
+
+      unsubReadings = onSnapshot(
+        query(readingsColRef, orderBy("takenAt", "desc"), limit(MAX_ROWS)),
+        (snap) => {
+          rawRows = snap.docs.map(d => {
+            const v = d.data();
+            return Object.assign({}, v, {
+              id: d.id,
+              uploadedAt: v.uploadedAt && v.uploadedAt.seconds ? v.uploadedAt.seconds : null
+            });
+          });
+          renderAll();
+        },
+        (err) => {
+          $('tbody').innerHTML =
+            `<tr><td colspan="13"><div class="empty">Could not load readings: ${esc(err.message)}</div></td></tr>`;
+        }
+      );
+    } else {
+      if (unsubDevice)   { unsubDevice(); unsubDevice = null; }
+      if (unsubReadings) { unsubReadings(); unsubReadings = null; }
+      rawRows = []; rows = []; plots = []; deviceState = null;
+      $('controlScreen').style.display = 'none';
+      $('loginScreen').style.display = 'block';
+      $('emailInput').value = '';
+      $('passwordInput').value = '';
+    }
+  });
+</script>
+
+</body>
+</html>

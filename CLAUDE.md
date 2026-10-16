@@ -15,6 +15,7 @@ Live site: https://capulongfarms.github.io/automation_home/
   - `button.html` — Button_LED
   - `incubator.html` — Incubator
   - `irrigation.html` — Irrigation Headend **and** Zone Node, tabbed (see below)
+  - `soil.html` — Soil Tester (portable probe; the only device that is usually offline)
 - **Firebase Authentication** (email/password) gates access on each device page — only signed-in users can read or write device state. The dashboard itself has no auth gate since it shows no device data.
 - **Cloud Firestore** (project `automation-home-4b86f`) holds live device state, one document per device under the `devices` collection (e.g. `devices/button_led`).
 - Real-time sync on the web side via Firestore's `onSnapshot` listener — no polling.
@@ -27,7 +28,7 @@ Live site: https://capulongfarms.github.io/automation_home/
 
 ## Devices
 
-Four boards, three pages — Irrigation is two boards on one page.
+Five boards, four pages — Irrigation is two boards on one page.
 
 | Firestore document | Device | Page | Description |
 |---|---|---|---|
@@ -35,6 +36,7 @@ Four boards, three pages — Irrigation is two boards on one page.
 | `devices/incubator` | ESP32 Incubator | `incubator.html` | Egg incubator: heater/humidifier (auto + manual override), fan, light, egg-turner. Also has a fully standalone local OLED + keypad menu, no WiFi required — this remote page is a convenience, not a dependency. |
 | `devices/irrigation_headend` | ESP32 Irrigation Headend | `irrigation.html` (Headend tab) | Pump room: duty/standby pumps (auto-alternating), fertigation, filtration, exhaust fan, water level + pressure + rain sensors, and the irrigation calendar |
 | `devices/irrigation_node1` | ESP32 Irrigation Zone Node | `irrigation.html` (Zone Node tab) | Six zone control valves, shared soil-moisture probe, rain sensor, one manual button per valve. Field-mounted — usually **out of WiFi range**. |
+| `devices/soil_tester` | ESP32 Soil Tester | `soil.html` | Portable RS485 probe carried into a field. Readings are taken on a button press, stamped from its own RTC, queued to flash, and uploaded when it next sees WiFi — so this page mostly shows history, not live state. The only device with a `readings/` **subcollection** rather than just a state document. N/P/K are deliberately absent: the probe derives them from conductivity and they are not measurements. |
 
 ### Irrigation is the one page that breaks the usual patterns
 
