@@ -1426,8 +1426,13 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
         '<div class="zone-state' + (open ? ' open' : '') + '">' +
         (open ? ('OPEN' + (remain > 0 ? ' &middot; closes in ' + remain + ' min' : '')) : 'Closed') +
         '</div></div>' +
+        // VERBS, not state words. These buttons used to read "Open" / "Close",
+        // which sit immediately beside a state field reading "Closed" / "OPEN"
+        // - so six shut valves presented six buttons saying "Open" and were
+        // read as six open valves. A control labelled with the same vocabulary
+        // as the status next to it will be mistaken for the status.
         '<button class="btn ' + (open ? 'btn-grey' : 'btn-blue') + '" data-zone="' + (i + 1) + '" data-open="' + (open ? '0' : '1') + '">' +
-        (open ? 'Close' : 'Open') + '</button>';
+        (open ? 'Close valve' : 'Open valve') + '</button>';
       list.appendChild(div);
     }
 
