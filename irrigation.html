@@ -669,6 +669,16 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
           <span>Manual run length</span>
           <span><input type="number" id="runMinInput" value="15" min="1" max="240"> min</span>
         </div>
+        <div class="row">
+          <span>Max zones open at once</span>
+          <span><input type="number" id="vMaxConInput" min="0" max="6" step="1" style="width:4em"></span>
+        </div>
+        <div class="row">
+          <span style="font-size:12px;opacity:.75">Open zones share the pump's flow, so each one
+          drops below its design pressure &mdash; and these solenoids hold current the whole time
+          they are open. <b>0 removes the limit entirely.</b></span>
+          <span></span>
+        </div>
         <div class="row" style="border-top:1px solid rgba(255,255,255,.12);padding-top:10px">
           <span>West sensor &mdash; dry / wet mV</span>
           <span><input type="number" id="soilDry0" step="10" style="width:5.5em">
@@ -1510,6 +1520,10 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     el.textContent = s.headLink ? 'ALIVE' : 'LOST';
     el.className = 'badge ' + (s.headLink ? 'on' : 'alm');
 
+    if (document.activeElement !== $('vMaxConInput') &&
+        typeof s.valveMaxConcurrent === 'number') {
+      $('vMaxConInput').value = s.valveMaxConcurrent;
+    }
     ['soilDry0', 'soilWet0', 'soilDry1', 'soilWet1'].forEach(k => {
       const v = s[k];
       if (typeof v === 'number' && document.activeElement !== $(k)) $(k).value = v.toFixed(0);
@@ -1706,6 +1720,12 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
 
   window.saveNodeThresholds = function () {
     const body = { soilWetThreshold: parseFloat($('soilWetInput').value) };
+
+    // Clamped here as well as on the device. The device clamp is the one that
+    // matters - it is the last writer before the veto reads it - but catching
+    // it here means the box cannot quietly hold a number the Node refused.
+    const vmc = parseInt($('vMaxConInput').value, 10);
+    if (Number.isFinite(vmc)) body.valveMaxConcurrent = Math.min(6, Math.max(0, vmc));
     // Only send calibration values that are actually filled in - a blank field
     // must not write NaN over a good calibration.
     ['soilDry0', 'soilWet0', 'soilDry1', 'soilWet1'].forEach(k => {
