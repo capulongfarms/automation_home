@@ -108,6 +108,18 @@
 
   .btn { padding: 7px 13px; border: none; border-radius: 6px; cursor: pointer; font-size: 0.8em; font-weight: 600; color: white; }
   .btn-primary { background: #0d7a5f; }
+  /* Action colours, matching 12.Incubator so the two pages read the same way.
+     Green ALWAYS means "this button turns something on", grey "turns it off" -
+     never the current state. State lives in a .badge, which is not clickable. */
+  .btn-on   { background: #4CAF50; }
+  .btn-off  { background: #999; }
+  .btn:disabled { opacity: .35; cursor: default; }
+  .mode-na { color: #aaa; font-size: 0.78em; }
+  table.ctl { width: 100%; border-collapse: collapse; margin-top: 6px; }
+  table.ctl th { font-size: .66em; text-transform: uppercase; letter-spacing: .05em;
+                 color: #8a8a8a; font-weight: 700; text-align: left; padding: 3px 5px; }
+  table.ctl td { padding: 6px 5px; border-top: 1px solid #ececec; font-size: .88em; }
+  table.ctl td:first-child { font-weight: 600; color: #333; }
   .btn-blue { background: #1565c0; }
   .btn-warn { background: #ef6c00; }
   .btn-danger { background: #c62828; }
@@ -394,39 +406,56 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
           <span><span class="badge alm">STARTER FAULT</span></span>
           <span style="opacity:.8">one of X1&ndash;X5 &mdash; check the panel</span>
         </div>
-        <div class="row"><span>Pump A</span><span>
-          <button class="mode-badge auto" id="pumpAOos" onclick="toggleOutOfService('A')">IN SERVICE</button>
-          <span class="badge off" id="pumpABadge">OFF</span></span></div>
-        <div class="row"><span>Pump B</span><span>
-          <button class="mode-badge auto" id="pumpBOos" onclick="toggleOutOfService('B')">IN SERVICE</button>
-          <span class="badge off" id="pumpBBadge">OFF</span></span></div>
+        <!-- Status is a BADGE, never a button; every button is an action and
+             says so with a verb or an unambiguous ON/OFF. The previous version
+             used one toggle per control whose label flipped between "Open" and
+             "Close" - which sits beside a status field using the same words,
+             and was duly read as the status. Same layout as 12.Incubator. -->
+        <table class="ctl">
+          <tr><th></th><th>Mode</th><th>Status</th><th>Manual ON</th><th>Manual OFF</th></tr>
+          <tr><td>Pump A</td>
+            <td><span class="badge off" id="pumpAReq">idle</span></td>
+            <td><span class="badge off" id="pumpABadge">OFF</span></td>
+            <td><button class="btn btn-on"  onclick="setPump('A',true)">ON</button></td>
+            <td><button class="btn btn-off" onclick="setPump('A',false)">OFF</button></td></tr>
+          <tr><td>Pump B</td>
+            <td><span class="badge off" id="pumpBReq">idle</span></td>
+            <td><span class="badge off" id="pumpBBadge">OFF</span></td>
+            <td><button class="btn btn-on"  onclick="setPump('B',true)">ON</button></td>
+            <td><button class="btn btn-off" onclick="setPump('B',false)">OFF</button></td></tr>
+          <tr><td>Fertigation</td>
+            <td><button class="mode-badge auto" id="fertMode" onclick="setOverride('fertigation','auto')">AUTO</button></td>
+            <td><span class="badge off" id="fertBadge">OFF</span></td>
+            <td><button class="btn btn-on"  onclick="setOverride('fertigation','on')">ON</button></td>
+            <td><button class="btn btn-off" onclick="setOverride('fertigation','off')">OFF</button></td></tr>
+          <tr><td>Filtration</td>
+            <td><button class="mode-badge auto" id="filtMode" onclick="setOverride('filtration','auto')">AUTO</button></td>
+            <td><span class="badge off" id="filtBadge">OFF</span></td>
+            <td><button class="btn btn-on"  onclick="setOverride('filtration','on')">ON</button></td>
+            <td><button class="btn btn-off" onclick="setOverride('filtration','off')">OFF</button></td></tr>
+          <tr><td>Exhaust fan</td>
+            <td><button class="mode-badge auto" id="fanMode" onclick="setOverride('exhaustFan','auto')">AUTO</button></td>
+            <td><span class="badge off" id="fanBadge">OFF</span></td>
+            <td><button class="btn btn-on"  onclick="setOverride('exhaustFan','on')">ON</button></td>
+            <td><button class="btn btn-off" onclick="setOverride('exhaustFan','off')">OFF</button></td></tr>
+        </table>
         <div class="row"><span>Duty pump (auto-alternates)</span><span id="dutyPump">&mdash;</span></div>
-        <div class="row">
-          <span>Fertigation</span>
-          <span><button class="mode-badge auto" id="fertMode" onclick="cycleOverride('fertigation')">AUTO</button>
-            <span class="badge off" id="fertBadge">OFF</span></span>
-        </div>
-        <div class="row">
-          <span>Filtration</span>
-          <span><button class="mode-badge auto" id="filtMode" onclick="cycleOverride('filtration')">AUTO</button>
-            <span class="badge off" id="filtBadge">OFF</span></span>
-        </div>
-        <div class="row">
-          <span>Exhaust fan</span>
-          <span><button class="mode-badge auto" id="fanMode" onclick="cycleOverride('exhaustFan')">AUTO</button>
-            <span class="badge off" id="fanBadge">OFF</span></span>
-        </div>
-        <!-- Mirrors the X1 / X2 buttons in the pump room, including their
-             mutual exclusion: requesting one drops the other. Two pumps on one
-             line is an overpressure, and while the trip would catch it, the
-             right fix is not asking for it. Either way the request still
-             passes the full interlock - it cannot start a pump into a closed
-             system. -->
-        <div class="row">
-          <span>Manual pump request <small style="opacity:.7">(X1 / X2)</small></span>
-          <span><button class="btn btn-grey" id="manualPumpABtn" onclick="toggleManualPump('A')">Pump A</button>
-            <button class="btn btn-grey" id="manualPumpBBtn" onclick="toggleManualPump('B')">Pump B</button></span>
-        </div>
+
+        <!-- Out of service is a HUMAN's assertion, not a measurement - with one
+             combined alarm loop the firmware cannot tell the pumps apart on a
+             fault. It protects nothing; it stops the duty rotation handing jobs
+             to a unit that is in pieces. -->
+        <table class="ctl">
+          <tr><th></th><th>Service</th><th>In service</th><th>Out of service</th></tr>
+          <tr><td>Pump A</td>
+            <td><span class="badge on" id="pumpAOos">IN SERVICE</span></td>
+            <td><button class="btn btn-on"  onclick="setService('A',true)">IN</button></td>
+            <td><button class="btn btn-off" onclick="setService('A',false)">OUT</button></td></tr>
+          <tr><td>Pump B</td>
+            <td><span class="badge on" id="pumpBOos">IN SERVICE</span></td>
+            <td><button class="btn btn-on"  onclick="setService('B',true)">IN</button></td>
+            <td><button class="btn btn-off" onclick="setService('B',false)">OUT</button></td></tr>
+        </table>
       </div>
 
       <div class="group group-sensor">
@@ -438,14 +467,19 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
              reading from either transducer is still judged in full and the
              bypass quietly stops mattering once they are wired. Not persisted:
              any reboot clears it. -->
-        <div class="row">
-          <span>Sensor bypass <small style="opacity:.7">(loop-open inhibits)</small></span>
-          <span><button class="btn btn-grey" id="bypassBtn" onclick="toggleBypass()">Off</button></span>
-        </div>
-        <div class="row">
-          <span>Alarm <small id="alarmReasonLive" style="opacity:.75">&mdash;</small></span>
-          <span><button class="btn" id="muteBtn" onclick="toggleMute()">Mute 30 min</button></span>
-        </div>
+        <table class="ctl">
+          <tr><th></th><th>Detail</th><th>Status</th><th></th><th></th></tr>
+          <tr><td>Sensor bypass</td>
+            <td><span class="mode-na">loop-open inhibits only</span></td>
+            <td><span class="badge off" id="bypassBadge">OFF</span></td>
+            <td><button class="btn btn-on"  onclick="setBypass(true)">BYPASS</button></td>
+            <td><button class="btn btn-off" onclick="setBypass(false)">RESTORE</button></td></tr>
+          <tr><td>Alarm</td>
+            <td><span class="mode-na" id="alarmReasonLive">&mdash;</span></td>
+            <td><span class="badge off" id="alarmBadge">quiet</span></td>
+            <td><button class="btn btn-off" id="muteBtn" onclick="setMute(true)">MUTE 30m</button></td>
+            <td><button class="btn btn-on"  onclick="setMute(false)">UN-MUTE</button></td></tr>
+        </table>
         <div class="row">
           <span>Pressure trip point</span>
           <span><input type="number" id="pressureTripInput" step="0.1" min="1" max="20"> bar</span>
@@ -738,6 +772,12 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   // Out of service is a HUMAN's assertion, not a measurement - the firmware
   // can no longer tell the two pumps apart on a fault. It stops the duty
   // rotation handing jobs to a unit that is in pieces; it protects nothing.
+  function setReqBadge(id, req) {
+    const el = $(id);
+    el.textContent = req ? 'REQUESTED' : 'idle';
+    el.className = 'badge ' + (req ? 'blue' : 'off');
+  }
+
   function setOosBadge(id, oos) {
     const el = $(id);
     if (oos) { el.textContent = 'OUT OF SERVICE'; el.className = 'mode-badge manual'; }
@@ -1308,6 +1348,12 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     setOosBadge('pumpAOos', !!data.pumpAOutOfService);
     setOosBadge('pumpBOos', !!data.pumpBOutOfService);
 
+    // Request is shown separately from Status on purpose: a pump can be
+    // requested and still not running, and that gap IS the interlock doing its
+    // job. Collapsing the two would hide the single most useful thing on the page.
+    setReqBadge('pumpAReq', !!data.manualPumpARequest);
+    setReqBadge('pumpBReq', !!data.manualPumpBRequest);
+
     setBadge('fertBadge', !!data.fertigationOn);
     setBadge('filtBadge', !!data.filtrationOn);
     setBadge('fanBadge', !!data.exhaustFanOn);
@@ -1315,11 +1361,10 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     setOverrideBadge('filtMode', !!data.filtrationManualOverride, !!data.filtrationManualState);
     setOverrideBadge('fanMode', !!data.exhaustFanManualOverride, !!data.exhaustFanManualState);
 
-    const mpA = !!data.manualPumpARequest, mpB = !!data.manualPumpBRequest;
-    $('manualPumpABtn').textContent = mpA ? 'Pump A - cancel' : 'Pump A';
-    $('manualPumpABtn').className = 'btn ' + (mpA ? 'btn-warn' : 'btn-grey');
-    $('manualPumpBBtn').textContent = mpB ? 'Pump B - cancel' : 'Pump B';
-    $('manualPumpBBtn').className = 'btn ' + (mpB ? 'btn-warn' : 'btn-grey');
+    const byp = !!data.sensorBypass;
+    const bb = $('bypassBadge');
+    bb.textContent = byp ? 'BYPASS ON' : 'OFF';
+    bb.className = 'badge ' + (byp ? 'alm' : 'off');
 
     // A missing pressure value means the 4-20mA loop is open (broken wire or
     // unpowered transducer) - deliberately NOT rendered as 0 bar, which would
@@ -1345,15 +1390,13 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     $('rainVal').textContent = (data.rainDetected ? 'Detected' : 'Clear') + rp;
     // Name the reason. A buzzer with no stated reason is one people learn to
     // ignore, and the device deliberately sounds only the top-ranked fault.
-    const byp = !!data.sensorBypass;
-    $('bypassBtn').textContent = byp ? 'ACTIVE - turn off' : 'Off';
-    $('bypassBtn').className = 'btn ' + (byp ? 'btn-warn' : 'btn-grey');
-
     const ar = data.alarmReason || '';
     $('alarmReasonLive').textContent = ar
       ? '(' + ar + (data.alarmUrgent ? ' - URGENT' : '') + ')'
       : '(none)';
-    $('muteBtn').textContent = data.alarmMuted ? 'Un-mute' : 'Mute 30 min';
+    const ab = $('alarmBadge');
+    ab.textContent = data.alarmMuted ? 'MUTED' : (ar ? 'SOUNDING' : 'quiet');
+    ab.className = 'badge ' + (data.alarmMuted ? 'blue' : (ar ? 'alm' : 'off'));
     $('muteBtn').disabled = !ar && !data.alarmMuted;
 
     if (document.activeElement !== $('pressureTripInput')) $('pressureTripInput').value = data.pressureTripBar ?? 6;
@@ -1426,13 +1469,14 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
         '<div class="zone-state' + (open ? ' open' : '') + '">' +
         (open ? ('OPEN' + (remain > 0 ? ' &middot; closes in ' + remain + ' min' : '')) : 'Closed') +
         '</div></div>' +
-        // VERBS, not state words. These buttons used to read "Open" / "Close",
-        // which sit immediately beside a state field reading "Closed" / "OPEN"
-        // - so six shut valves presented six buttons saying "Open" and were
-        // read as six open valves. A control labelled with the same vocabulary
-        // as the status next to it will be mistaken for the status.
-        '<button class="btn ' + (open ? 'btn-grey' : 'btn-blue') + '" data-zone="' + (i + 1) + '" data-open="' + (open ? '0' : '1') + '">' +
-        (open ? 'Close valve' : 'Open valve') + '</button>';
+        // BOTH buttons, always, with the inapplicable one disabled - rather
+        // than one button whose label flips. A single toggle reading "Open"
+        // sits beside a status reading "Closed" and gets taken for the status,
+        // which is exactly how six shut valves were read as six open ones.
+        '<span class="zone-ctl">' +
+        '<button class="btn btn-on"  data-zone="' + (i + 1) + '" data-open="1"' + (open ? ' disabled' : '') + '>Open valve</button> ' +
+        '<button class="btn btn-off" data-zone="' + (i + 1) + '" data-open="0"' + (open ? '' : ' disabled') + '>Close valve</button>' +
+        '</span>';
       list.appendChild(div);
     }
 
@@ -1577,40 +1621,40 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     document.querySelectorAll('.schedZone').forEach(c => c.checked = false);
   };
 
-  window.cycleOverride = function (which) {
-    // AUTO -> MANUAL-ON -> MANUAL-OFF -> AUTO, matching the keypad menu's own
-    // three-state cycle on the device.
+  // One function, one named destination - replacing a cycler that advanced
+  // AUTO -> ON -> OFF on each press. A cycler cannot tell you where the next
+  // click lands, so you press it and find out, which is the wrong way round
+  // for anything wired to a pump.
+  window.setOverride = function (which, mode) {
     const ovKey = which + 'ManualOverride';
     const stKey = which + 'ManualState';
-    const ov = !!(headState && headState[ovKey]);
-    const st = !!(headState && headState[stKey]);
-    let next;
-    if (!ov) next = { [ovKey]: true, [stKey]: true };
-    else if (st) next = { [ovKey]: true, [stKey]: false };
-    else next = { [ovKey]: false, [stKey]: false };
-    patch(headDocRef, next);
+    if (mode === 'auto') patch(headDocRef, { [ovKey]: false, [stKey]: false });
+    else                 patch(headDocRef, { [ovKey]: true, [stKey]: mode === 'on' });
   };
 
-  window.toggleManualPump = function (which) {
+  window.setPump = function (which, on) {
     const key   = which === 'B' ? 'manualPumpBRequest' : 'manualPumpARequest';
     const other = which === 'B' ? 'manualPumpARequest' : 'manualPumpBRequest';
-    const want  = !(headState && headState[key]);
-    // Clear the other in the SAME patch. Two writes would leave a window in
-    // which both are set, and the device acts on whatever it reads.
-    patch(headDocRef, want ? { [key]: true, [other]: false } : { [key]: false });
+    // Clearing the other in the SAME patch, not a second write: two writes
+    // leave a window where both read true, and the device acts on what it sees.
+    patch(headDocRef, on ? { [key]: true, [other]: false } : { [key]: false },
+          'Pump ' + which + (on ? ' requested' : ' request cancelled'));
   };
 
-  window.toggleOutOfService = function (which) {
+  window.setService = function (which, inService) {
     const key = which === 'B' ? 'pumpBOutOfService' : 'pumpAOutOfService';
-    const want = !(headState && headState[key]);
-    patch(headDocRef, { [key]: want },
-          'Pump ' + which + (want ? ' marked out of service' : ' back in service'));
+    patch(headDocRef, { [key]: !inService },
+          'Pump ' + which + (inService ? ' back in service' : ' marked out of service'));
   };
 
-  window.toggleBypass = function () {
-    const want = !(headState && headState.sensorBypass);
-    patch(headDocRef, { sensorBypass: want },
-          want ? 'Sensor bypass ON - survives reboot &mdash; off when transducers arrive' : 'Sensor bypass off');
+  window.setBypass = function (on) {
+    patch(headDocRef, { sensorBypass: on },
+          on ? 'Sensor bypass ON - survives reboot, turn off when transducers are wired'
+             : 'Sensor bypass off - loop-open inhibits live again');
+  };
+
+  window.setMute = function (on) {
+    patch(headDocRef, { alarmMuted: on }, on ? 'Alarm muted' : 'Alarm un-muted');
   };
 
   window.syncClock = function () {
@@ -1630,14 +1674,6 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     // Encoded as zoneMask * 1000 + minutes so one integer field carries the
     // whole request - the device decodes it the same way.
     patch(headDocRef, { startJobRequest: (1 << (zone - 1)) * 1000 + mins }, 'Run requested');
-  };
-
-  // Mute times out in the firmware after 30 minutes rather than latching, so
-  // this cannot quietly disable monitoring for good - and a NEW condition
-  // breaks through an existing mute on the device side.
-  window.toggleMute = function () {
-    const muted = !!(headState && headState.alarmMuted);
-    patch(headDocRef, { alarmMuted: !muted }, muted ? 'Alarm un-muted' : 'Alarm muted');
   };
 
   window.saveThresholds = function () {
