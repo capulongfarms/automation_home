@@ -1605,7 +1605,7 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   window.toggleBypass = function () {
     const want = !(headState && headState.sensorBypass);
     patch(headDocRef, { sensorBypass: want },
-          want ? 'Sensor bypass ON - clears on reboot' : 'Sensor bypass off');
+          want ? 'Sensor bypass ON - survives reboot &mdash; off when transducers arrive' : 'Sensor bypass off');
   };
 
   window.syncClock = function () {
