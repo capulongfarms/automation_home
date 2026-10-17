@@ -1337,7 +1337,12 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     $('levelVal').textContent = (lOk && typeof data.waterLevelPercent === 'number')
       ? data.waterLevelPercent.toFixed(0) + ' %' : 'SENSOR FAULT';
     $('levelVal').style.color = lOk ? '' : '#c62828';
-    $('rainVal').textContent = data.rainDetected ? 'Detected' : 'Clear';
+    // The percentage belongs next to the verdict. It was only rendered down in
+    // the thresholds card, so the status row read "Clear" with no number and
+    // the obvious place to look had nothing in it.
+    const rp = (typeof data.rainSensorPercent === 'number')
+      ? '  (' + data.rainSensorPercent.toFixed(0) + ' %)' : '';
+    $('rainVal').textContent = (data.rainDetected ? 'Detected' : 'Clear') + rp;
     // Name the reason. A buzzer with no stated reason is one people learn to
     // ignore, and the device deliberately sounds only the top-ranked fault.
     const byp = !!data.sensorBypass;
@@ -1353,8 +1358,14 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
 
     if (document.activeElement !== $('pressureTripInput')) $('pressureTripInput').value = data.pressureTripBar ?? 6;
     if (document.activeElement !== $('levelMinInput')) $('levelMinInput').value = data.levelMinPercent ?? 15;
-    if (document.activeElement !== $('rainOnInput'))  $('rainOnInput').value  = data.rainOnPercent  ?? 75;
-    if (document.activeElement !== $('rainOffInput')) $('rainOffInput').value = data.rainOffPercent ?? 70;
+    // NO hardcoded fallback. These used to default to 75/70, which was a third
+    // copy of a value that also lived at the firmware declaration and in its
+    // NVS load - so when the device moved to 86/83 the page calmly displayed
+    // numbers that were neither its own nor Firestore's. Blank is honest.
+    if (document.activeElement !== $('rainOnInput'))
+      $('rainOnInput').value = (typeof data.rainOnPercent === 'number') ? data.rainOnPercent : '';
+    if (document.activeElement !== $('rainOffInput'))
+      $('rainOffInput').value = (typeof data.rainOffPercent === 'number') ? data.rainOffPercent : '';
     // The live figure is the whole calibration method - without it the
     // thresholds are guesswork.
     $('rainPctLive').textContent = (typeof data.rainSensorPercent === 'number')
