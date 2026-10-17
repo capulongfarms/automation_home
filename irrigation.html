@@ -385,30 +385,47 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
 
       <div class="group group-pump">
         <h3>Pumps &amp; pump room</h3>
-        <div class="row"><span>Pump A</span><span><span id="pumpAAlarm"></span> <span class="badge off" id="pumpABadge">OFF</span></span></div>
-        <div class="row"><span>Pump B</span><span><span id="pumpBAlarm"></span> <span class="badge off" id="pumpBBadge">OFF</span></span></div>
+        <!-- One combined fault input, not five. The starters' auxiliary
+             contacts cut their own coils, so protection does not depend on
+             this board; X6 only tells us that SOMETHING opened. Which unit it
+             was is a two-second look at the panel, which is why this row says
+             where to look rather than pretending to know. -->
+        <div class="row" id="starterFaultRow" style="display:none">
+          <span><span class="badge alm">STARTER FAULT</span></span>
+          <span style="opacity:.8">one of X1&ndash;X5 &mdash; check the panel</span>
+        </div>
+        <div class="row"><span>Pump A</span><span>
+          <button class="mode-badge auto" id="pumpAOos" onclick="toggleOutOfService('A')">IN SERVICE</button>
+          <span class="badge off" id="pumpABadge">OFF</span></span></div>
+        <div class="row"><span>Pump B</span><span>
+          <button class="mode-badge auto" id="pumpBOos" onclick="toggleOutOfService('B')">IN SERVICE</button>
+          <span class="badge off" id="pumpBBadge">OFF</span></span></div>
         <div class="row"><span>Duty pump (auto-alternates)</span><span id="dutyPump">&mdash;</span></div>
         <div class="row">
           <span>Fertigation</span>
-          <span><span id="fertAlarm"></span>
-            <button class="mode-badge auto" id="fertMode" onclick="cycleOverride('fertigation')">AUTO</button>
+          <span><button class="mode-badge auto" id="fertMode" onclick="cycleOverride('fertigation')">AUTO</button>
             <span class="badge off" id="fertBadge">OFF</span></span>
         </div>
         <div class="row">
           <span>Filtration</span>
-          <span><span id="filtAlarm"></span>
-            <button class="mode-badge auto" id="filtMode" onclick="cycleOverride('filtration')">AUTO</button>
+          <span><button class="mode-badge auto" id="filtMode" onclick="cycleOverride('filtration')">AUTO</button>
             <span class="badge off" id="filtBadge">OFF</span></span>
         </div>
         <div class="row">
           <span>Exhaust fan</span>
-          <span><span id="fanAlarm"></span>
-            <button class="mode-badge auto" id="fanMode" onclick="cycleOverride('exhaustFan')">AUTO</button>
+          <span><button class="mode-badge auto" id="fanMode" onclick="cycleOverride('exhaustFan')">AUTO</button>
             <span class="badge off" id="fanBadge">OFF</span></span>
         </div>
+        <!-- Mirrors the X1 / X2 buttons in the pump room, including their
+             mutual exclusion: requesting one drops the other. Two pumps on one
+             line is an overpressure, and while the trip would catch it, the
+             right fix is not asking for it. Either way the request still
+             passes the full interlock - it cannot start a pump into a closed
+             system. -->
         <div class="row">
-          <span>Manual pump request</span>
-          <span><button class="btn btn-grey" id="manualPumpBtn" onclick="toggleManualPump()">Request</button></span>
+          <span>Manual pump request <small style="opacity:.7">(X1 / X2)</small></span>
+          <span><button class="btn btn-grey" id="manualPumpABtn" onclick="toggleManualPump('A')">Pump A</button>
+            <button class="btn btn-grey" id="manualPumpBBtn" onclick="toggleManualPump('B')">Pump B</button></span>
         </div>
       </div>
 
@@ -417,14 +434,37 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
         <div class="row"><span>Line pressure</span><span id="pressureVal">&mdash;</span></div>
         <div class="row"><span>Water level</span><span id="levelVal">&mdash;</span></div>
         <div class="row"><span>Rain</span><span id="rainVal">&mdash;</span></div>
+        <!-- Suppresses ONLY the two "4-20mA loop open" inhibits, so a real
+             reading from either transducer is still judged in full and the
+             bypass quietly stops mattering once they are wired. Not persisted:
+             any reboot clears it. -->
+        <div class="row">
+          <span>Sensor bypass <small style="opacity:.7">(loop-open inhibits)</small></span>
+          <span><button class="btn btn-grey" id="bypassBtn" onclick="toggleBypass()">Off</button></span>
+        </div>
+        <div class="row">
+          <span>Alarm <small id="alarmReasonLive" style="opacity:.75">&mdash;</small></span>
+          <span><button class="btn" id="muteBtn" onclick="toggleMute()">Mute 30 min</button></span>
+        </div>
         <div class="row">
           <span>Pressure trip point</span>
           <span><input type="number" id="pressureTripInput" step="0.1" min="1" max="20"> bar</span>
         </div>
         <div class="row">
           <span>Minimum water level</span>
-          <span><input type="number" id="levelMinInput" step="1" min="0" max="100"> %
+          <span><input type="number" id="levelMinInput" step="1" min="0" max="100"> %</span>
+        </div>
+        <div class="row">
+          <span>Rain sensor reading <small id="rainPctLive" style="opacity:.75">&mdash;</small></span>
+          <span><input type="number" id="rainOnInput" step="1" min="0" max="100" title="rain starts at or above">
+                <input type="number" id="rainOffInput" step="1" min="0" max="100" title="rain stops below"> %
             <button class="btn btn-primary" onclick="saveThresholds()">Save</button></span>
+        </div>
+        <div class="row">
+          <span style="font-size:12px;opacity:.75">On / off, and ON must stay above OFF.
+          Note the live figure dry, wet the board, note it again, then set ON just
+          above the dry number. Bone dry should read around 67 %.</span>
+          <span></span>
         </div>
       </div>
 
@@ -449,6 +489,16 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
 
       <div class="group group-sched">
         <h3>Irrigation calendar</h3>
+        <!-- The calendar cannot run at all without a clock: handleScheduler()
+             returns immediately while clockIsLive is false. NTP is blocked on
+             the carrier this farm uses, and setDateTimeManual() is otherwise
+             only reachable from the I2C keypad, which is not fitted - so on a
+             fresh board this button is the ONLY way to start the calendar.
+             The browser already knows the time; send it. -->
+        <div class="row">
+          <span>Device clock <b id="clockState">&mdash;</b></span>
+          <span><button class="btn btn-grey" id="clockBtn" onclick="syncClock()">Sync from this browser</button></span>
+        </div>
         <svg class="tl" id="tlSvgHead" viewBox="0 0 720 46" role="img"
              aria-label="Twenty-four hour timeline of today's scheduled valve runs, shown as red blocks, with a marker at the current time."></svg>
         <div class="tl-legend" id="tlLegendHead">&mdash;</div>
@@ -555,7 +605,7 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
 
       <div class="group group-sensor">
         <h3>Field sensors</h3>
-        <div class="row"><span>Soil moisture</span><span id="soilVal">&mdash;</span></div>
+        <div id="soilRows"></div>
         <div class="row"><span>Rain</span><span id="nodeRainVal">&mdash;</span></div>
         <div class="row"><span>Headend LoRa link</span><span class="badge off" id="headLinkBadge">&mdash;</span></div>
         <div class="row"><span>Node network</span><span id="nodeNet">&mdash;</span></div>
@@ -584,6 +634,22 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
         <div class="row">
           <span>Manual run length</span>
           <span><input type="number" id="runMinInput" value="15" min="1" max="240"> min</span>
+        </div>
+        <div class="row" style="border-top:1px solid rgba(255,255,255,.12);padding-top:10px">
+          <span>West sensor &mdash; dry / wet mV</span>
+          <span><input type="number" id="soilDry0" step="10" style="width:5.5em">
+                <input type="number" id="soilWet0" step="10" style="width:5.5em"></span>
+        </div>
+        <div class="row">
+          <span>East sensor &mdash; dry / wet mV</span>
+          <span><input type="number" id="soilDry1" step="10" style="width:5.5em">
+                <input type="number" id="soilWet1" step="10" style="width:5.5em"></span>
+        </div>
+        <div class="row">
+          <span style="font-size:12px;opacity:.75">Dry is the HIGHER voltage &mdash; sensor in air.
+          Wet is saturated soil. Read both from the mV figure above, or send
+          <code>soilraw</code> over USB.</span>
+          <span></span>
         </div>
         <div class="row">
           <span></span>
@@ -669,10 +735,13 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     el.className = 'badge ' + (state ? 'on' : 'off');
   }
 
-  function setAlarm(id, active) {
+  // Out of service is a HUMAN's assertion, not a measurement - the firmware
+  // can no longer tell the two pumps apart on a fault. It stops the duty
+  // rotation handing jobs to a unit that is in pieces; it protects nothing.
+  function setOosBadge(id, oos) {
     const el = $(id);
-    el.textContent = active ? 'ALARM' : '';
-    el.className = active ? 'badge alm' : '';
+    if (oos) { el.textContent = 'OUT OF SERVICE'; el.className = 'mode-badge manual'; }
+    else     { el.textContent = 'IN SERVICE';     el.className = 'mode-badge auto'; }
   }
 
   function setOverrideBadge(id, override, state) {
@@ -724,19 +793,45 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
 
   // Builds one view of the node from whichever source is currently better, so
   // the rendering code never has to care where a value came from.
+  // Soil arrives as a JSON STRING, not a Firestore array - the firmware
+  // publishes it that way so two probes cost one field instead of fourteen.
+  // Both sources use the same shape. The sensors are capacitive and report
+  // moisture only - there is no temperature or EC to lose - but the Headend
+  // mirror still carries less: no raw millivolts and no calibration, because
+  // neither crosses LoRa.
+  function parseSoil(raw) {
+    if (!raw) return [];
+    try {
+      const v = JSON.parse(raw);
+      return Array.isArray(v) ? v : [];
+    } catch (e) {
+      return [];
+    }
+  }
+
   function resolvedNode() {
     if (nodeIsFresh()) {
       return {
         source: 'node',
         valves: nodeState.valves || '000000',
         remaining: (nodeState.valveMinutesRemaining || '').split(','),
-        soil: nodeState.soilMoisturePercent,
-        rain: !!nodeState.rainDetected,
+        soil: parseSoil(nodeState.soilData),
+        // Rain is measured at the Headend for the whole farm as of 2026-08-26 -
+        // 300m of site against rain cells kilometres wide. The Node has no rain
+        // sensor and publishes no rain field, so this reads the Headend's
+        // document in BOTH branches rather than preferring a Node value that no
+        // longer exists.
+        rain: !!(headState && headState.rainDetected),
         headLink: !!nodeState.headLinkAlive,
         network: nodeState.network || null,
         veto: nodeState.lastVetoReason || '',
         vetoAge: nodeState.vetoAgeSeconds ?? null,
-        soilWet: nodeState.soilWetThreshold
+        soilWet: nodeState.soilWetThreshold,
+        // Calibration lives on the Node and never crosses LoRa, so it is
+        // populated on this branch only. In mirror mode the fields stay blank
+        // rather than showing a value that cannot be written back.
+        soilDry0: nodeState.soilDry0, soilWet0: nodeState.soilWet0,
+        soilDry1: nodeState.soilDry1, soilWet1: nodeState.soilWet1
       };
     }
     if (headState) {
@@ -744,8 +839,8 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
         source: 'mirror',
         valves: headState.nodeValves || '000000',
         remaining: [],
-        soil: headState.nodeSoilMoisture,
-        rain: !!headState.nodeRainDetected,
+        soil: parseSoil(headState.nodeSoilData),
+        rain: !!headState.rainDetected,
         headLink: !!headState.nodeLinkAlive,
         veto: '',
         vetoAge: null,
@@ -836,14 +931,18 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     const dutyA = d.dutyPumpIsA !== false;
     const anyPump = pumpA || pumpB;
 
-    cls($('mPumpA'), 'eq', d.almPumpA ? 'fault' : (pumpA ? 'on' : ''));
-    cls($('mPumpB'), 'eq', d.almPumpB ? 'fault' : (pumpB ? 'on' : ''));
+    // With one combined alarm input we cannot say WHICH starter tripped, so
+    // every unit it could have been is flagged. Reading that as "all five
+    // failed" would be wrong - the row above the mimic says so in words.
+    const gAlm = !!d.globalAlarm;
+    cls($('mPumpA'), 'eq', gAlm ? 'fault' : (pumpA ? 'on' : ''));
+    cls($('mPumpB'), 'eq', gAlm ? 'fault' : (pumpB ? 'on' : ''));
     $('mPumpADuty').textContent = dutyA ? 'DUTY' : 'STANDBY';
     $('mPumpBDuty').textContent = dutyA ? 'STANDBY' : 'DUTY';
 
-    cls($('mFilt'), 'eq', d.almFiltration ? 'fault' : (d.filtrationOn ? 'on' : ''));
-    cls($('mFert'), 'eq', d.almFertigation ? 'fault' : (d.fertigationOn ? 'on' : ''));
-    cls($('mFan'),  'eq', d.almExhaustFan ? 'fault' : (d.exhaustFanOn ? 'on' : ''));
+    cls($('mFilt'), 'eq', gAlm ? 'fault' : (d.filtrationOn ? 'on' : ''));
+    cls($('mFert'), 'eq', gAlm ? 'fault' : (d.fertigationOn ? 'on' : ''));
+    cls($('mFan'),  'eq', gAlm ? 'fault' : (d.exhaustFanOn ? 'on' : ''));
 
     // Tank. The fill is drawn from the bottom up, so both y and height move.
     const lOk = d.levelOk !== false;
@@ -940,7 +1039,13 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
       marks.appendChild(g);
     }
 
-    $('mSoilVal').textContent = (typeof st.soil === 'number') ? st.soil.toFixed(0) : '--';
+    // Both probes side by side rather than a single figure - a site average
+    // would hide exactly the difference the second probe was bought to find.
+    const soilList = st.soil || [];
+    $('mSoilVal').textContent = soilList.length
+      ? soilList.map(g => (typeof g.m === 'number' && g.fresh !== false)
+                            ? g.m.toFixed(0) : '--').join(' / ')
+      : '--';
     $('mNodeRain').textContent = st.rain ? 'WET' : 'DRY';
     const openN = (st.valves || '').split('').filter(c => c === '1').length;
     $('mNodeCap').textContent = openN
@@ -1187,14 +1292,21 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
 
     $('headNet').textContent = data.network || '—';
 
+    // A clock that has never been set is not a detail - it silently stops the
+    // whole calendar, so it is called out rather than left to be noticed.
+    const live = !!data.clockIsLive;
+    $('clockState').textContent = live
+      ? (data.currentEpoch ? epochToLocalText(data.currentEpoch) : 'set')
+      : 'NEVER SET - calendar will not run';
+    $('clockState').style.color = live ? '' : '#b91c1c';
+    $('clockBtn').className = 'btn ' + (live ? 'btn-grey' : 'btn-warn');
+
     setBadge('pumpABadge', !!data.pumpARunning, data.pumpARunning ? 'RUNNING' : 'OFF');
     setBadge('pumpBBadge', !!data.pumpBRunning, data.pumpBRunning ? 'RUNNING' : 'OFF');
     $('dutyPump').textContent = data.dutyPumpIsA === false ? 'Pump B' : 'Pump A';
-    setAlarm('pumpAAlarm', !!data.almPumpA);
-    setAlarm('pumpBAlarm', !!data.almPumpB);
-    setAlarm('fertAlarm', !!data.almFertigation);
-    setAlarm('filtAlarm', !!data.almFiltration);
-    setAlarm('fanAlarm', !!data.almExhaustFan);
+    $('starterFaultRow').style.display = data.globalAlarm ? '' : 'none';
+    setOosBadge('pumpAOos', !!data.pumpAOutOfService);
+    setOosBadge('pumpBOos', !!data.pumpBOutOfService);
 
     setBadge('fertBadge', !!data.fertigationOn);
     setBadge('filtBadge', !!data.filtrationOn);
@@ -1203,9 +1315,11 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     setOverrideBadge('filtMode', !!data.filtrationManualOverride, !!data.filtrationManualState);
     setOverrideBadge('fanMode', !!data.exhaustFanManualOverride, !!data.exhaustFanManualState);
 
-    const mp = !!data.manualPumpRequest;
-    $('manualPumpBtn').textContent = mp ? 'Requested - cancel' : 'Request';
-    $('manualPumpBtn').className = 'btn ' + (mp ? 'btn-warn' : 'btn-grey');
+    const mpA = !!data.manualPumpARequest, mpB = !!data.manualPumpBRequest;
+    $('manualPumpABtn').textContent = mpA ? 'Pump A - cancel' : 'Pump A';
+    $('manualPumpABtn').className = 'btn ' + (mpA ? 'btn-warn' : 'btn-grey');
+    $('manualPumpBBtn').textContent = mpB ? 'Pump B - cancel' : 'Pump B';
+    $('manualPumpBBtn').className = 'btn ' + (mpB ? 'btn-warn' : 'btn-grey');
 
     // A missing pressure value means the 4-20mA loop is open (broken wire or
     // unpowered transducer) - deliberately NOT rendered as 0 bar, which would
@@ -1224,9 +1338,27 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
       ? data.waterLevelPercent.toFixed(0) + ' %' : 'SENSOR FAULT';
     $('levelVal').style.color = lOk ? '' : '#c62828';
     $('rainVal').textContent = data.rainDetected ? 'Detected' : 'Clear';
+    // Name the reason. A buzzer with no stated reason is one people learn to
+    // ignore, and the device deliberately sounds only the top-ranked fault.
+    const byp = !!data.sensorBypass;
+    $('bypassBtn').textContent = byp ? 'ACTIVE - turn off' : 'Off';
+    $('bypassBtn').className = 'btn ' + (byp ? 'btn-warn' : 'btn-grey');
+
+    const ar = data.alarmReason || '';
+    $('alarmReasonLive').textContent = ar
+      ? '(' + ar + (data.alarmUrgent ? ' - URGENT' : '') + ')'
+      : '(none)';
+    $('muteBtn').textContent = data.alarmMuted ? 'Un-mute' : 'Mute 30 min';
+    $('muteBtn').disabled = !ar && !data.alarmMuted;
 
     if (document.activeElement !== $('pressureTripInput')) $('pressureTripInput').value = data.pressureTripBar ?? 6;
     if (document.activeElement !== $('levelMinInput')) $('levelMinInput').value = data.levelMinPercent ?? 15;
+    if (document.activeElement !== $('rainOnInput'))  $('rainOnInput').value  = data.rainOnPercent  ?? 75;
+    if (document.activeElement !== $('rainOffInput')) $('rainOffInput').value = data.rainOffPercent ?? 70;
+    // The live figure is the whole calibration method - without it the
+    // thresholds are guesswork.
+    $('rainPctLive').textContent = (typeof data.rainSensorPercent === 'number')
+      ? '(now ' + data.rainSensorPercent.toFixed(0) + ' %)' : '';
 
     const linkAlive = !!data.nodeLinkAlive;
     setBadge('nodeLinkBadge', linkAlive, linkAlive ? 'ALIVE' : 'LOST');
@@ -1288,12 +1420,40 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
       list.appendChild(div);
     }
 
-    $('soilVal').textContent = (typeof s.soil === 'number') ? s.soil.toFixed(0) + ' %' : '--';
+    // One row per probe, naming the zones it speaks for - without that the
+    // two numbers are just two numbers and nobody knows which valves they
+    // govern. Zone grouping mirrors ZONE_SOIL_GROUP in 14.Nodes.ino.
+    const ZONES_FOR = { West: '1-3', East: '4-6' };
+    const rows = (s.soil || []).map(g => {
+      const zones = ZONES_FOR[g.name] || '';
+      let val;
+      if (typeof g.m !== 'number') {
+        val = '<span class="badge off">no reading</span>';
+        if (typeof g.mv === 'number') val += ' <small>' + g.mv.toFixed(0) + ' mV raw</small>';
+      } else {
+        val = g.m.toFixed(0) + ' %';
+        // Raw millivolts alongside the percentage: it is the only thing that
+        // distinguishes "wired but uncalibrated" from "reading correctly", and
+        // it is what you type into the calibration fields below.
+        if (typeof g.mv === 'number') val += ' <small>&middot; ' + g.mv.toFixed(0) + ' mV</small>';
+        if (g.fresh === false) val += ' <span class="badge off">stale</span>';
+      }
+      return '<div class="row"><span>' + g.name + ' soil' +
+             (zones ? ' <small>(zones ' + zones + ')</small>' : '') +
+             '</span><span>' + val + '</span></div>';
+    });
+    $('soilRows').innerHTML = rows.length
+      ? rows.join('')
+      : '<div class="row"><span>Soil</span><span>&mdash;</span></div>';
     $('nodeRainVal').textContent = s.rain ? 'Detected' : 'Clear';
     const el = $('headLinkBadge');
     el.textContent = s.headLink ? 'ALIVE' : 'LOST';
     el.className = 'badge ' + (s.headLink ? 'on' : 'alm');
 
+    ['soilDry0', 'soilWet0', 'soilDry1', 'soilWet1'].forEach(k => {
+      const v = s[k];
+      if (typeof v === 'number' && document.activeElement !== $(k)) $(k).value = v.toFixed(0);
+    });
     if (typeof s.soilWet === 'number' && document.activeElement !== $('soilWetInput')) {
       $('soilWetInput').value = s.soilWet;
     }
@@ -1415,8 +1575,34 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     patch(headDocRef, next);
   };
 
-  window.toggleManualPump = function () {
-    patch(headDocRef, { manualPumpRequest: !(headState && headState.manualPumpRequest) });
+  window.toggleManualPump = function (which) {
+    const key   = which === 'B' ? 'manualPumpBRequest' : 'manualPumpARequest';
+    const other = which === 'B' ? 'manualPumpARequest' : 'manualPumpBRequest';
+    const want  = !(headState && headState[key]);
+    // Clear the other in the SAME patch. Two writes would leave a window in
+    // which both are set, and the device acts on whatever it reads.
+    patch(headDocRef, want ? { [key]: true, [other]: false } : { [key]: false });
+  };
+
+  window.toggleOutOfService = function (which) {
+    const key = which === 'B' ? 'pumpBOutOfService' : 'pumpAOutOfService';
+    const want = !(headState && headState[key]);
+    patch(headDocRef, { [key]: want },
+          'Pump ' + which + (want ? ' marked out of service' : ' back in service'));
+  };
+
+  window.toggleBypass = function () {
+    const want = !(headState && headState.sensorBypass);
+    patch(headDocRef, { sensorBypass: want },
+          want ? 'Sensor bypass ON - clears on reboot' : 'Sensor bypass off');
+  };
+
+  window.syncClock = function () {
+    // Seconds, UTC - the devices store every epoch as UTC and only this page
+    // renders local. Date.now() is already UTC-based, so no conversion.
+    const epoch = Math.floor(Date.now() / 1000);
+    patch(headDocRef, { setDateTimeRequest: epoch },
+          'Clock sent: ' + epochToLocalText(epoch));
   };
 
   window.resetFault = function () { patch(headDocRef, { resetFaultRequest: true }, 'Fault reset requested'); };
@@ -1430,10 +1616,29 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     patch(headDocRef, { startJobRequest: (1 << (zone - 1)) * 1000 + mins }, 'Run requested');
   };
 
+  // Mute times out in the firmware after 30 minutes rather than latching, so
+  // this cannot quietly disable monitoring for good - and a NEW condition
+  // breaks through an existing mute on the device side.
+  window.toggleMute = function () {
+    const muted = !!(headState && headState.alarmMuted);
+    patch(headDocRef, { alarmMuted: !muted }, muted ? 'Alarm un-muted' : 'Alarm muted');
+  };
+
   window.saveThresholds = function () {
+    // The firmware rejects a crossed pair too, but only says so on serial -
+    // from here that looks like the save silently doing nothing. ON below OFF
+    // inverts the hysteresis and chatters the pump around the setpoint.
+    const rOn = parseFloat($('rainOnInput').value);
+    const rOff = parseFloat($('rainOffInput').value);
+    if (!(rOn > rOff)) {
+      $('syncNote').textContent = 'Rain ON must be above OFF - not saved';
+      return;
+    }
     patch(headDocRef, {
       pressureTripBar: parseFloat($('pressureTripInput').value),
-      levelMinPercent: parseFloat($('levelMinInput').value)
+      levelMinPercent: parseFloat($('levelMinInput').value),
+      rainOnPercent: parseFloat($('rainOnInput').value),
+      rainOffPercent: parseFloat($('rainOffInput').value)
     }, 'Thresholds saved');
   };
 
@@ -1448,7 +1653,14 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   window.closeAll = function () { patch(nodeDocRef, { closeAllRequest: true }, 'Close-all requested'); };
 
   window.saveNodeThresholds = function () {
-    patch(nodeDocRef, { soilWetThreshold: parseFloat($('soilWetInput').value) }, 'Thresholds saved');
+    const body = { soilWetThreshold: parseFloat($('soilWetInput').value) };
+    // Only send calibration values that are actually filled in - a blank field
+    // must not write NaN over a good calibration.
+    ['soilDry0', 'soilWet0', 'soilDry1', 'soilWet1'].forEach(k => {
+      const v = parseFloat($(k).value);
+      if (!isNaN(v)) body[k] = v;
+    });
+    patch(nodeDocRef, body, 'Thresholds saved');
   };
 
   onAuthStateChanged(auth, (user) => {
