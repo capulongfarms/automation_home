@@ -166,18 +166,40 @@
     .topbar-nav .navbtn span { display: none; }
     .navbtn { padding: 9px 11px; }
   }
+  /* The farm mark leads; the project glyph sits with the title. Brand first,
+     then which of its five pages you are on - the same order the hub uses. */
+  .topbar-logo {
+    width: 42px; height: 42px; flex: none;
+    border-radius: 11px;
+    display: block;
+    box-shadow: 0 5px 14px -7px rgba(31,50,25,.7);
+  }
+  .topbar-glyph {
+    width: 17px; height: 17px;
+    color: var(--pg-accent);
+    vertical-align: -3px;
+    margin-right: 6px;
+  }
+  .login-logo {
+    display: block;
+    width: 100%;
+    max-width: 360px;
+    height: auto;
+    margin: 0 auto 20px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px -14px rgba(31,50,25,.6);
+  }
 </style>
 </head>
 <body>
 
   <div class="topbar">
     <div class="topbar-id">
-      <div class="topbar-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.2 12 3.6l9 7.6"/><path d="M5.6 9.8v9.1a1.5 1.5 0 0 0 1.5 1.5h9.8a1.5 1.5 0 0 0 1.5-1.5V9.8"/><path d="M12.9 11.6 10.3 15.3h3.3l-2.5 3.6"/></svg>
-      </div>
+      <img class="topbar-logo" src="icon.png" width="512" height="512"
+           alt="Capulong Farms">
       <div>
         <span class="topbar-sub">Capulong Farms</span>
-        <h1 class="topbar-title">Home Automation</h1>
+        <h1 class="topbar-title"><svg class="topbar-glyph" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M3 11.2 12 3.6l9 7.6"/><path d="M5.6 9.8v9.1a1.5 1.5 0 0 0 1.5 1.5h9.8a1.5 1.5 0 0 0 1.5-1.5V9.8"/><path d="M12.9 11.6 10.3 15.3h3.3l-2.5 3.6"/></svg>Home Automation</h1>
       </div>
     </div>
     <nav class="topbar-nav">
@@ -187,6 +209,8 @@
   </div>
 
   <div id="loginScreen">
+    <img class="login-logo" src="logo.png" width="1400" height="450"
+         alt="Capulong Farms - Lanang, Candaba, Pampanga">
     <h2>Home Automation</h2>
     <div class="subtitle">Sign in to control your lighting, outlets and alarms</div>
     <input type="email" id="emailInput" placeholder="Email" autocomplete="username">

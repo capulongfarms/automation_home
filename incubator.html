@@ -289,18 +289,40 @@
     .topbar-nav .navbtn span { display: none; }
     .navbtn { padding: 9px 11px; }
   }
+  /* The farm mark leads; the project glyph sits with the title. Brand first,
+     then which of its five pages you are on - the same order the hub uses. */
+  .topbar-logo {
+    width: 42px; height: 42px; flex: none;
+    border-radius: 11px;
+    display: block;
+    box-shadow: 0 5px 14px -7px rgba(31,50,25,.7);
+  }
+  .topbar-glyph {
+    width: 17px; height: 17px;
+    color: var(--pg-accent);
+    vertical-align: -3px;
+    margin-right: 6px;
+  }
+  .login-logo {
+    display: block;
+    width: 100%;
+    max-width: 360px;
+    height: auto;
+    margin: 0 auto 20px;
+    border-radius: 10px;
+    box-shadow: 0 8px 24px -14px rgba(31,50,25,.6);
+  }
 </style>
 </head>
 <body>
 
   <div class="topbar">
     <div class="topbar-id">
-      <div class="topbar-mark" aria-hidden="true">
-        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6c3.5 0 6.4 4.6 6.4 8.9a6.4 6.4 0 1 1-12.8 0c0-4.3 2.9-8.9 6.4-8.9Z"/><path d="M8 21c1.1-.9 2.2-.9 3.3 0s2.2.9 3.3 0"/></svg>
-      </div>
+      <img class="topbar-logo" src="icon.png" width="512" height="512"
+           alt="Capulong Farms">
       <div>
         <span class="topbar-sub">Capulong Farms</span>
-        <h1 class="topbar-title">Incubator</h1>
+        <h1 class="topbar-title"><svg class="topbar-glyph" aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6c3.5 0 6.4 4.6 6.4 8.9a6.4 6.4 0 1 1-12.8 0c0-4.3 2.9-8.9 6.4-8.9Z"/><path d="M8 21c1.1-.9 2.2-.9 3.3 0s2.2.9 3.3 0"/></svg>Incubator</h1>
       </div>
     </div>
     <nav class="topbar-nav">
@@ -310,6 +332,8 @@
   </div>
 
   <div id="loginScreen">
+    <img class="login-logo" src="logo.png" width="1400" height="450"
+         alt="Capulong Farms - Lanang, Candaba, Pampanga">
     <h2>Incubator</h2>
     <div class="subtitle">Sign in to control your incubator</div>
     <input type="email" id="emailInput" placeholder="Email" autocomplete="username">
