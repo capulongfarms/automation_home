@@ -200,10 +200,6 @@
   .egg-type-row select { flex: 1; padding: 6px; border: 1px solid #ccc; border-radius: 6px; font-size: 0.9em; background: white; }
 
   #syncNote { color: #999; font-size: 0.8em; margin: 4px 0 12px; min-height: 1.2em; text-align: center; }
-  #signOutBtn {
-    background: none; border: 1px solid #ccc; color: #666;
-    padding: 8px 16px; border-radius: 6px; cursor: pointer; font-size: 0.85em;
-  }
   #userEmail { color: #999; font-size: 0.8em; margin-bottom: 4px; }
 
   /* Back to the dashboard. Deliberately a direct child of <body> rather than
@@ -211,25 +207,99 @@
      the wrong device page and having no way back short of the browser's own
      back button is the case this exists for. Relative flat href matches
      automation_home's deployed layout, where every page sits at the repo root. */
-  .homelink {
-    display: inline-block;
-    margin-bottom: 18px;
-    padding: 8px 16px;
-    border-radius: 20px;
-    background: rgba(255,255,255,0.9);
-    border: 1px solid #d5d9dd;
-    color: #555;
-    text-decoration: none;
-    font-size: 0.85em;
-    font-weight: 600;
-    transition: background-color 0.15s, color 0.15s;
+  :root { --pg-accent: #2b7fd4; }
+
+  /* ---------- Page topbar (identity left, navigation right) ----------
+     Added 2026-10-18. Every page previously opened with a bare "<- Home" pill
+     and buried Sign out at the very bottom of a long scroll, and the Soil
+     Tester had no title at all once you were past the login box - so a page
+     reached from a bookmark did not say what it was. The bar carries the same
+     title and mark as that project's card on the home page, so the two read as
+     one system rather than four pages that happen to be linked. */
+  .topbar {
+    width: 100%;
+    max-width: var(--topbar-max, 1100px);
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
   }
-  .homelink:hover { background: #fff; color: #222; }
+  .topbar-id { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .topbar-mark {
+    width: 40px; height: 40px; flex: none;
+    border-radius: 11px;
+    display: grid; place-items: center;
+    color: #fff;
+    background: var(--pg-accent);
+    box-shadow: 0 5px 14px -6px var(--pg-accent);
+  }
+  .topbar-mark svg { width: 23px; height: 23px; }
+  .topbar-title {
+    margin: 0;
+    font-size: 1.12rem;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar-sub {
+    display: block;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: .55;
+  }
+  .topbar-nav { display: flex; align-items: center; gap: 8px; }
+  .navbtn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(128,138,150,.38);
+    background: rgba(255,255,255,.72);
+    color: #46525f;
+    font: inherit;
+    font-size: 0.83rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .navbtn svg { width: 16px; height: 16px; }
+  .navbtn:hover { background: #fff; color: #1b2430; border-color: rgba(128,138,150,.6); }
+  .navbtn.danger:hover { background: #fdecea; color: #b3261e; border-color: #f0b4ae; }
+  @media (prefers-color-scheme: dark) {
+    .navbtn { background: rgba(255,255,255,.07); color: #c3ced9; border-color: rgba(255,255,255,.18); }
+    .navbtn:hover { background: rgba(255,255,255,.13); color: #fff; }
+    .navbtn.danger:hover { background: rgba(179,38,30,.22); color: #ffb4ab; border-color: rgba(255,180,171,.4); }
+  }
+  @media (max-width: 440px) {
+    .topbar-nav .navbtn span { display: none; }
+    .navbtn { padding: 9px 11px; }
+  }
 </style>
 </head>
 <body>
 
-  <a class="homelink" href="index.html">&larr; Home</a>
+  <div class="topbar">
+    <div class="topbar-id">
+      <div class="topbar-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2.6c3.5 0 6.4 4.6 6.4 8.9a6.4 6.4 0 1 1-12.8 0c0-4.3 2.9-8.9 6.4-8.9Z"/><path d="M8 21c1.1-.9 2.2-.9 3.3 0s2.2.9 3.3 0"/></svg>
+      </div>
+      <div>
+        <span class="topbar-sub">Capulong Farms</span>
+        <h1 class="topbar-title">Incubator</h1>
+      </div>
+    </div>
+    <nav class="topbar-nav">
+      <a class="navbtn" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.2 11.3 12 3.9l8.8 7.4"/><path d="M5.7 10v8.7a1.4 1.4 0 0 0 1.4 1.4h9.8a1.4 1.4 0 0 0 1.4-1.4V10"/></svg><span>Home</span></a>
+      <button class="navbtn danger" id="logoutBtn" style="display:none" onclick="signOutUser()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5h3a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-3"/><path d="M4.5 12h9.3"/><path d="M10.6 8.4 14.2 12l-3.6 3.6"/></svg><span>Logout</span></button>
+    </nav>
+  </div>
 
   <div id="loginScreen">
     <h2>Incubator</h2>
@@ -589,7 +659,6 @@
     </div>
 
     <div id="syncNote">Connecting...</div>
-    <button id="signOutBtn" onclick="signOutUser()">Sign out</button>
   </div>
 
 <script type="module">
@@ -720,6 +789,20 @@
   window.mJump = mJump;
   window.mKey = mKey;
 
+  // "5", or "18+2" once the phase has run past its length. Mirrors
+  // cycleDayText() in the firmware - if you change the format, change both, or
+  // the OLED and this page will disagree in front of the customer.
+  //
+  // The overrun exists because the day count is CLAMPED at the phase length:
+  // without it "Day 18 of 18" reads identically on day 18 and on day 40, and
+  // the one thing an operator needs to know at that point is how long it has
+  // been sitting there.
+  function cycleDayLabel(d) {
+    const over = Number(d.cycleOverrunDays ?? 0);
+    const day  = d.cycleDay ?? '?';
+    return over > 0 ? (d.cycleDurationDays + '+' + over) : String(day);
+  }
+
   function renderMimic(d) {
     const fault = false;   // the turner has no detectable fault state any more
     const urgent = !!d.alarmUrgent;
@@ -824,7 +907,7 @@
     // heading of its own - "Hatching Day 1 of 3" says both.
     if ($('mDayTxt')) $('mDayTxt').textContent = d.cycleActive
       ? ((d.operationMode === 'hatcher' ? 'Hatching Day ' : 'Incubation Day ')
-         + (d.cycleDay ?? '?') + ' of ' + (d.cycleDurationDays ?? '?'))
+         + cycleDayLabel(d) + ' of ' + (d.cycleDurationDays ?? '?'))
       : 'No cycle running';
   }
 
@@ -971,7 +1054,10 @@
     const isHatcher = data.operationMode === 'hatcher';
     $('opModeBadge').textContent = isHatcher ? 'HATCHER' : 'INCUBATOR';
     $('opModeBadge').className = 'badge-mode ' + (isHatcher ? 'hatcher' : 'incubator');
-    $('cycleProgress').textContent = data.cycleActive ? ('Day ' + data.cycleDay + '/' + data.cycleDurationDays) : 'Not Started';
+    $('cycleProgress').textContent = data.cycleActive
+      ? ('Day ' + cycleDayLabel(data) + '/' + data.cycleDurationDays
+         + (data.phaseComplete ? ' — COMPLETE' : ''))
+      : 'Not Started';
     $('startCycleBtn').textContent = data.cycleActive ? 'Restart' : 'Start';
     $('eggTypeSelect').value = data.eggType ?? 'Chicken';
 
@@ -1189,6 +1275,7 @@
     if (user) {
       $('loginScreen').style.display = 'none';
       $('controlScreen').style.display = 'block';
+      $('logoutBtn').style.display = '';
       $('userEmail').textContent = 'Signed in as ' + user.email;
 
       unsubscribeSnapshot = onSnapshot(stateDocRef, (snap) => {
@@ -1205,6 +1292,7 @@
     } else {
       if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
       $('controlScreen').style.display = 'none';
+      $('logoutBtn').style.display = 'none';
       $('loginScreen').style.display = 'block';
       $('emailInput').value = '';
       $('passwordInput').value = '';

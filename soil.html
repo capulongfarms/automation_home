@@ -165,17 +165,99 @@
     font-size: 0.72em; overflow-x: auto; line-height: 1.5;
   }
 
-  .homelink {
-    align-self: flex-start; margin-bottom: 14px; text-decoration: none;
-    background: rgba(255,255,255,0.75); color: #444; padding: 7px 13px; border-radius: 8px;
-    font-size: 0.85em; font-weight: 600; transition: background 0.15s, color 0.15s;
+  :root { --pg-accent: #8a5a3b; }
+
+  /* ---------- Page topbar (identity left, navigation right) ----------
+     Added 2026-10-18. Every page previously opened with a bare "<- Home" pill
+     and buried Sign out at the very bottom of a long scroll, and the Soil
+     Tester had no title at all once you were past the login box - so a page
+     reached from a bookmark did not say what it was. The bar carries the same
+     title and mark as that project's card on the home page, so the two read as
+     one system rather than four pages that happen to be linked. */
+  .topbar {
+    width: 100%;
+    max-width: var(--topbar-max, 1100px);
+    margin: 0 auto 20px;
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 14px;
+    flex-wrap: wrap;
   }
-  .homelink:hover { background: #fff; color: #222; }
+  .topbar-id { display: flex; align-items: center; gap: 11px; min-width: 0; }
+  .topbar-mark {
+    width: 40px; height: 40px; flex: none;
+    border-radius: 11px;
+    display: grid; place-items: center;
+    color: #fff;
+    background: var(--pg-accent);
+    box-shadow: 0 5px 14px -6px var(--pg-accent);
+  }
+  .topbar-mark svg { width: 23px; height: 23px; }
+  .topbar-title {
+    margin: 0;
+    font-size: 1.12rem;
+    font-weight: 700;
+    letter-spacing: -0.012em;
+    line-height: 1.2;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+  .topbar-sub {
+    display: block;
+    font-size: 0.66rem;
+    font-weight: 700;
+    letter-spacing: 0.14em;
+    text-transform: uppercase;
+    opacity: .55;
+  }
+  .topbar-nav { display: flex; align-items: center; gap: 8px; }
+  .navbtn {
+    display: inline-flex; align-items: center; gap: 6px;
+    padding: 8px 14px;
+    border-radius: 999px;
+    border: 1px solid rgba(128,138,150,.38);
+    background: rgba(255,255,255,.72);
+    color: #46525f;
+    font: inherit;
+    font-size: 0.83rem;
+    font-weight: 600;
+    text-decoration: none;
+    cursor: pointer;
+    transition: background .15s ease, color .15s ease, border-color .15s ease;
+  }
+  .navbtn svg { width: 16px; height: 16px; }
+  .navbtn:hover { background: #fff; color: #1b2430; border-color: rgba(128,138,150,.6); }
+  .navbtn.danger:hover { background: #fdecea; color: #b3261e; border-color: #f0b4ae; }
+  @media (prefers-color-scheme: dark) {
+    .navbtn { background: rgba(255,255,255,.07); color: #c3ced9; border-color: rgba(255,255,255,.18); }
+    .navbtn:hover { background: rgba(255,255,255,.13); color: #fff; }
+    .navbtn.danger:hover { background: rgba(179,38,30,.22); color: #ffb4ab; border-color: rgba(255,180,171,.4); }
+  }
+  @media (max-width: 440px) {
+    .topbar-nav .navbtn span { display: none; }
+    .navbtn { padding: 9px 11px; }
+  }
 </style>
 </head>
 <body>
 
-  <a class="homelink" href="index.html">&larr; Home</a>
+  <div class="topbar">
+    <div class="topbar-id">
+      <div class="topbar-mark" aria-hidden="true">
+        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.75" stroke-linecap="round" stroke-linejoin="round"><path d="M2.8 14.6h18.4"/><path d="M8 3.4v11.2"/><path d="M6.2 3.4h3.6"/><path d="M8 18.2v2.4"/><path d="M16 14.6c0-3 1-4.8 3.2-5.9"/><path d="M16 11.4c-2.2.2-3.4-.8-3.4-2.6 2-.5 3.4.6 3.4 2.6Z"/></svg>
+      </div>
+      <div>
+        <span class="topbar-sub">Capulong Farms</span>
+        <h1 class="topbar-title">Soil Tester</h1>
+      </div>
+    </div>
+    <nav class="topbar-nav">
+      <a class="navbtn" href="index.html"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3.2 11.3 12 3.9l8.8 7.4"/><path d="M5.7 10v8.7a1.4 1.4 0 0 0 1.4 1.4h9.8a1.4 1.4 0 0 0 1.4-1.4V10"/></svg><span>Home</span></a>
+      <button class="navbtn danger" id="logoutBtn" style="display:none" onclick="signOutUser()"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.9" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M14.5 3.5h3a2 2 0 0 1 2 2v13a2 2 0 0 1-2 2h-3"/><path d="M4.5 12h9.3"/><path d="M10.6 8.4 14.2 12l-3.6 3.6"/></svg><span>Logout</span></button>
+    </nav>
+  </div>
 
   <div id="loginScreen">
     <h2>Soil Tester</h2>
@@ -457,9 +539,6 @@ readingId = "&lt;deviceId&gt;-&lt;takenAt&gt;-&lt;seq&gt;"
       </div>
     </div>
 
-    <div style="text-align:center; margin: 8px 0 24px">
-      <button class="act ghost" onclick="signOutUser()">Sign out</button>
-    </div>
   </div>
 
 <script type="module">
@@ -943,6 +1022,7 @@ readingId = "&lt;deviceId&gt;-&lt;takenAt&gt;-&lt;seq&gt;"
     if (user) {
       $('loginScreen').style.display = 'none';
       $('controlScreen').style.display = 'block';
+      $('logoutBtn').style.display = '';
       $('userEmail').textContent = 'Signed in as ' + user.email;
       $('aWhen').value = localInputNow();
 
@@ -978,6 +1058,7 @@ readingId = "&lt;deviceId&gt;-&lt;takenAt&gt;-&lt;seq&gt;"
       if (unsubReadings) { unsubReadings(); unsubReadings = null; }
       rawRows = []; rows = []; plots = []; deviceState = null;
       $('controlScreen').style.display = 'none';
+      $('logoutBtn').style.display = 'none';
       $('loginScreen').style.display = 'block';
       $('emailInput').value = '';
       $('passwordInput').value = '';
