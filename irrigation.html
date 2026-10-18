@@ -3,6 +3,9 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
+<link rel="icon" href="icon.png" type="image/png">
+<link rel="apple-touch-icon" href="icon.png">
+<meta name="theme-color" content="#1F3219">
 <title>Irrigation Control</title>
 <style>
   body {
@@ -269,7 +272,7 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   .provbar { background: #2e2318; border-color: #6b4a22; border-left-color: #e2954a; color: #e8c9a4; }
   .provbar b { color: #f0d6b4; }
 }
-  :root { --pg-accent: #0d7a5f; }
+  :root { --pg-accent: #2F6F6A; }
 
   /* ---------- Page topbar (identity left, navigation right) ----------
      Added 2026-10-18. Every page previously opened with a bare "<- Home" pill
@@ -300,6 +303,7 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   .topbar-mark svg { width: 23px; height: 23px; }
   .topbar-title {
     margin: 0;
+    color: #1F3219;
     font-size: 1.12rem;
     font-weight: 700;
     letter-spacing: -0.012em;
@@ -310,11 +314,15 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   }
   .topbar-sub {
     display: block;
+    color: #1F3219;
     font-size: 0.66rem;
     font-weight: 700;
     letter-spacing: 0.14em;
     text-transform: uppercase;
     opacity: .55;
+  }
+  @media (prefers-color-scheme: dark) {
+    .topbar-title, .topbar-sub { color: #EDF0E7; }
   }
   .topbar-nav { display: flex; align-items: center; gap: 8px; }
   .navbtn {
