@@ -1506,11 +1506,35 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
         // distinguishes "wired but uncalibrated" from "reading correctly", and
         // it is what you type into the calibration fields below.
         if (typeof g.mv === 'number') val += ' <small>&middot; ' + g.mv.toFixed(0) + ' mV</small>';
-        if (g.fresh === false) val += ' <span class="badge off">stale</span>';
       }
+
+      // WOULD IT BLOCK AN OPEN RIGHT NOW? The reading alone does not answer
+      // that, and the gap is where the confusion lives: openVetoReason()
+      // requires soilFresh(g) as well as moisture >= threshold, so a STALE
+      // probe reading 85% blocks nothing at all. That is deliberate - a dead
+      // sensor must not be able to stop irrigation indefinitely, which would
+      // kill a crop to protect a reading - but it means a high number on this
+      // page does not imply a veto, and nothing said so until now.
+      //
+      // This mirrors the device's condition exactly. If the two ever disagree,
+      // 14.Nodes.ino is right and this line is wrong.
+      const thr = (typeof s.soilWet === 'number') ? s.soilWet : null;
+      let verdict = '';
+      if (g.fresh === false) {
+        verdict = '<span class="badge off" title="A stale probe never vetoes - by design">'
+                + 'STALE &mdash; cannot block</span>';
+      } else if (typeof g.m === 'number' && thr !== null) {
+        verdict = (g.m >= thr)
+          ? '<span class="badge alm" title="openVetoReason() refuses an open for these zones">'
+            + 'BLOCKS OPENS</span>'
+          : '<span class="badge on" title="Below the wet threshold - opens are allowed">'
+            + 'allows</span>';
+      }
+
       return '<div class="row"><span>' + g.name + ' soil' +
              (zones ? ' <small>(zones ' + zones + ')</small>' : '') +
-             '</span><span>' + val + '</span></div>';
+             (thr !== null ? ' <small style="opacity:.6">&ge; ' + thr + ' % blocks</small>' : '') +
+             '</span><span>' + val + (verdict ? ' ' + verdict : '') + '</span></div>';
     });
     $('soilRows').innerHTML = rows.length
       ? rows.join('')
