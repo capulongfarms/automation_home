@@ -662,7 +662,7 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
       <div class="group group-cfg">
         <h3>Thresholds</h3>
         <div class="row">
-          <span>Soil counts as wet above</span>
+          <span>Soil counts as wet above <small id="soilPctLive" style="opacity:.75">&mdash;</small></span>
           <span><input type="number" id="soilWetInput" step="1" min="0" max="100"> %</span>
         </div>
         <div class="row">
@@ -1539,6 +1539,13 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     $('soilRows').innerHTML = rows.length
       ? rows.join('')
       : '<div class="row"><span>Soil</span><span>&mdash;</span></div>';
+    // Echoed beside the threshold box, mirroring the Headend's rain row -
+    // you cannot judge a threshold without the number it is judging.
+    const live = (s.soil || [])
+      .filter(g => typeof g.m === 'number')
+      .map(g => g.name + ' ' + g.m.toFixed(0) + ' %' + (g.fresh === false ? ' (stale)' : ''));
+    $('soilPctLive').textContent = live.length ? '(now ' + live.join(', ') + ')' : '—';
+
     $('nodeRainVal').textContent = s.rain ? 'Detected' : 'Clear';
     const el = $('headLinkBadge');
     el.textContent = s.headLink ? 'ALIVE' : 'LOST';
