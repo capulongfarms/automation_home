@@ -189,8 +189,52 @@
     border-radius: 10px;
     box-shadow: 0 8px 24px -14px rgba(31,50,25,.6);
   }
+
+  /* ---------- Control screen ----------
+     Same contract as 12.Incubator and the irrigation page: Status is a
+     read-only badge, every button is an action with an unambiguous label, and
+     nothing clickable reports state. */
+  #controlScreen { display: none; max-width: 760px; margin: 0 auto; }
+  .card { background:#FDFBF7; border:1px solid rgba(31,50,25,.11); border-radius:14px;
+          padding:16px 18px; margin-bottom:14px;
+          box-shadow:0 8px 22px -15px rgba(31,50,25,.35); }
+  .card h3 { margin:0 0 10px; font-size:.97rem; font-weight:700; color:#1F3219;
+             letter-spacing:-.01em; }
+  .row { display:flex; align-items:center; justify-content:space-between; gap:10px;
+         padding:7px 0; border-top:1px solid #eceae3; font-size:.88rem; }
+  .row:first-of-type { border-top:0; }
+  .badge { padding:3px 9px; border-radius:11px; color:#fff; font-weight:700;
+           font-size:.68rem; letter-spacing:.03em; }
+  .badge.on   { background:#4A7C3F; }
+  .badge.off  { background:#9aa394; }
+  .badge.alm  { background:#B6593F; }
+  .badge.blue { background:#2F6F6A; }
+  table.ctl { width:100%; border-collapse:collapse; margin-top:4px; }
+  table.ctl th { font-size:.64rem; text-transform:uppercase; letter-spacing:.06em;
+                 color:#8a9184; font-weight:700; text-align:left; padding:3px 4px; }
+  table.ctl td { padding:6px 4px; border-top:1px solid #eceae3; font-size:.85rem; }
+  table.ctl td:first-child { font-weight:600; color:#2a3a24; }
+  .btn { padding:6px 11px; border:0; border-radius:7px; cursor:pointer;
+         font:inherit; font-size:.78rem; font-weight:600; color:#fff; }
+  .btn-on   { background:#4A7C3F; }
+  .btn-off  { background:#9aa394; }
+  .btn-warn { background:#B6593F; }
+  .btn-blue { background:#2F6F6A; }
+  .btn:disabled { opacity:.32; cursor:default; }
+  input[type=number], input[type=time] {
+    padding:5px 7px; border:1px solid #cfd6c8; border-radius:6px;
+    font:inherit; font-size:.82rem; width:5.2em; }
+  .muted { color:#8a9184; font-size:.74rem; }
+  .alarm-banner { background:#fdecea; color:#B6593F; border-left:4px solid #B6593F;
+                  border-radius:8px; padding:11px 14px; font-weight:700;
+                  margin-bottom:12px; font-size:.9rem; }
+  @media (max-width:430px) {
+    table.ctl td, table.ctl th { padding:5px 2px; font-size:.78rem; }
+    .btn { padding:6px 8px; }
+  }
 </style>
 </head>
+
 <body>
 
   <div class="topbar">
@@ -220,12 +264,108 @@
   </div>
 
   <div id="controlScreen">
-    <div id="userEmail"></div>
-    <h2>ESP32 LED Control</h2>
-    <div id="ledIcon"><div class="bulb"></div><div class="base"></div></div>
-    <p>LED Status: <span id="ledStateLabel">--</span></p>
-    <button id="toggleBtn" onclick="toggleLED()">Button</button>
-    <div id="syncNote">Connecting...</div>
+    <div id="userEmail" class="muted" style="text-align:right;margin-bottom:8px"></div>
+
+    <div id="alarmBanner" class="alarm-banner" style="display:none"></div>
+
+    <div class="card">
+      <h3>Alarm system</h3>
+      <div class="row">
+        <span>State</span>
+        <span><span class="badge off" id="armBadge">DISARMED</span></span>
+      </div>
+      <div class="row">
+        <span>Controls <small class="muted">(30 s exit delay on arming)</small></span>
+        <span>
+          <button class="btn btn-on"   onclick="setArmed(true)">ARM</button>
+          <button class="btn btn-off"  onclick="setArmed(false)">DISARM</button>
+          <button class="btn btn-warn" id="ackBtn" onclick="ackAlarm()">ACKNOWLEDGE</button>
+        </span>
+      </div>
+      <table class="ctl">
+        <tr><th>Zone</th><th>Input</th><th>Contact</th><th>Monitored</th></tr>
+        <tbody id="zoneRows"></tbody>
+      </table>
+      <p class="muted" style="margin:8px 0 0">Zones are normally-open contacts &mdash;
+         a <b>closed</b> contact is a trip. An unmonitored zone is ignored even while armed.</p>
+    </div>
+
+    <div class="card">
+      <h3>Lighting &amp; sockets <small class="muted">Y01&ndash;Y08, wall switches X01&ndash;X08</small></h3>
+      <table class="ctl">
+        <tr><th></th><th>Status</th><th>Switch</th><th>ON</th><th>OFF</th></tr>
+        <tbody id="lightRows"></tbody>
+      </table>
+    </div>
+
+    <div class="card">
+      <h3>Outdoor lighting <small class="muted">Y09&ndash;Y11, on a clock</small></h3>
+      <table class="ctl">
+        <tr><th></th><th>Status</th><th>On at</th><th>Off at</th></tr>
+        <tbody id="outdoorRows"></tbody>
+      </table>
+      <div class="row">
+        <span class="muted">Replaces the analog timers. Windows may cross midnight.</span>
+        <span><button class="btn btn-blue" onclick="saveSchedule()">Save times</button></span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3>Garden valve <small class="muted">Y12</small></h3>
+      <div class="row">
+        <span>State</span>
+        <span><span class="badge off" id="valveBadge">off</span></span>
+      </div>
+      <div class="row">
+        <span>Run for <input type="number" id="valveMin" min="1" max="240" step="1"> min</span>
+        <span>
+          <button class="btn btn-on"  onclick="openValve()">OPEN</button>
+          <button class="btn btn-off" onclick="closeValve()">CLOSE</button>
+        </span>
+      </div>
+      <p class="muted" style="margin:8px 0 0">Every open carries a deadline. A valve left
+         open is the one fault here that empties a tank, so there is no indefinite open.</p>
+    </div>
+
+    <div class="card">
+      <h3>Climate <small class="muted">TEM1 / TEM2 driving Y13 / Y14</small></h3>
+      <table class="ctl">
+        <tr><th></th><th>Reading</th><th>Fan</th><th>Setpoint &deg;C</th></tr>
+        <tr><td>Kitchen</td>
+          <td id="t1Val">&mdash;</td>
+          <td><span class="badge off" id="fan1Badge">off</span></td>
+          <td><input type="number" id="sp1" min="10" max="50" step="0.5"></td></tr>
+        <tr><td>Family room</td>
+          <td id="t2Val">&mdash;</td>
+          <td><span class="badge off" id="fan2Badge">off</span></td>
+          <td><input type="number" id="sp2" min="10" max="50" step="0.5"></td></tr>
+      </table>
+      <div class="row">
+        <span>Drop-out below setpoint by <input type="number" id="hyst" min="0.2" max="10" step="0.1"> &deg;C</span>
+        <span><button class="btn btn-blue" onclick="saveClimate()">Save</button></span>
+      </div>
+      <p class="muted" style="margin:8px 0 0">A sensor reading nothing holds its fan
+         <b>off</b> &mdash; a fan running on a dead sensor wastes power quietly, one that
+         never runs gets noticed.</p>
+    </div>
+
+    <div class="card">
+      <h3>System</h3>
+      <div class="row"><span>Device clock <b id="clockState">&mdash;</b></span>
+        <span><button class="btn btn-blue" id="clockBtn" onclick="syncClock()">Sync from this browser</button></span></div>
+      <div class="row"><span>Input expanders <small class="muted">0x26 / 0x27</small></span>
+        <span><span class="badge off" id="inBusBadge">&mdash;</span></span></div>
+      <div class="row"><span>Output expanders <small class="muted">0x24 / 0x25</small></span>
+        <span><span class="badge off" id="outBusBadge">&mdash;</span></span></div>
+      <div class="row"><span>Network</span><span id="netVal" class="muted">&mdash;</span></div>
+      <div class="row"><span>Siren runs for <input type="number" id="sirenMin" min="0" max="60" step="1"> min</span>
+        <span><button class="btn btn-blue" onclick="saveSiren()">Save</button></span></div>
+      <p class="muted" style="margin:8px 0 0">The siren self-silences; the alarm stays
+         latched until acknowledged. NTP is blocked on this carrier, so the clock comes
+         from the browser &mdash; without it the outdoor schedule never runs.</p>
+    </div>
+
+    <div id="syncNote" class="muted" style="text-align:center;margin:4px 0 24px">Connecting...</div>
   </div>
 
 <script type="module">
@@ -236,9 +376,6 @@
   import { getFirestore, doc, setDoc, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
-  // Public web config - safe to expose client-side. Real access control is
-  // enforced server-side by Firestore Security Rules (restricted to specific UIDs),
-  // not by keeping this config secret.
   const firebaseConfig = {
     apiKey: "AIzaSyDnk7DM6Cw0P-NBUb9GeMxxaQhE6E6s9GE",
     authDomain: "automation-home-4b86f.firebaseapp.com",
@@ -251,50 +388,171 @@
   const app  = initializeApp(firebaseConfig);
   const auth = getAuth(app);
   const db   = getFirestore(app);
-
-  const stateDocRef = doc(db, "devices", "button_led");
-
-  let currentState = false;
-  let unsubscribeSnapshot = null;
+  const ref  = doc(db, "devices", "button_led");
 
   const $ = id => document.getElementById(id);
+  let state = {};
+  let unsub = null;
+
+  const MODE_MANUAL = 0;
+
+  function parse(raw, fallback) {
+    if (typeof raw !== 'string') return fallback;
+    try { return JSON.parse(raw); } catch (e) { return fallback; }
+  }
+  function badge(el, text, cls) { el.textContent = text; el.className = 'badge ' + cls; }
+  function hhmm(mins) {
+    const m = ((mins % 1440) + 1440) % 1440;
+    return String(Math.floor(m / 60)).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+  }
+  function toMins(v) {
+    const p = (v || '').split(':');
+    return p.length === 2 ? (parseInt(p[0], 10) * 60 + parseInt(p[1], 10)) : 0;
+  }
+  // Writes are merged, never whole-document: the device owns most of these
+  // fields and a full overwrite would erase whatever it published last.
+  const patch = (o) => setDoc(ref, o, { merge: true });
 
   window.signIn = async function () {
     $('loginError').textContent = '';
     try {
       await signInWithEmailAndPassword(auth, $('emailInput').value.trim(), $('passwordInput').value);
-    } catch (e) {
-      $('loginError').textContent = 'Sign-in failed: ' + e.message;
+    } catch (e) { $('loginError').textContent = 'Sign-in failed: ' + e.message; }
+  };
+  window.signOutUser = async function () { await signOut(auth); };
+
+  // ---- actions ----
+  window.setArmed = (on) => patch({ alarmArmRequest: on });
+  window.ackAlarm = () => patch({ alarmAckRequest: true });
+
+  // setOutputs is the full 16-channel picture every time, because the device
+  // compares it against what it already has and only acts on MANUAL channels.
+  // Sending one channel would mean inventing the other fifteen.
+  window.setOut = function (i, on) {
+    const outs = parse(state.outputs, []);
+    let s = '';
+    for (let k = 0; k < 16; k++) {
+      const cur = outs[k] ? !!outs[k].on : false;
+      s += (k === i ? (on ? '1' : '0') : (cur ? '1' : '0'));
     }
+    patch({ setOutputs: s });
   };
 
-  window.signOutUser = async function () {
-    await signOut(auth);
+  window.toggleZone = function (z) {
+    const zones = parse(state.zones, []);
+    let s = '';
+    for (let k = 0; k < 8; k++) {
+      const cur = zones[k] ? zones[k].en !== false : true;
+      s += (k === z ? (cur ? '0' : '1') : (cur ? '1' : '0'));
+    }
+    patch({ zoneEnabled: s });
   };
 
-  window.toggleLED = async function () {
-    const newState = !currentState;
-    $('syncNote').textContent = 'Updating...';
-    try {
-      await setDoc(stateDocRef, { ledState: newState }, { merge: true });
-    } catch (e) {
-      $('syncNote').textContent = 'Update failed: ' + e.message;
+  window.openValve = function () {
+    const m = parseInt($('valveMin').value, 10);
+    if (Number.isFinite(m) && m > 0) patch({ valveRunMinutes: m, valveOpenRequest: m });
+  };
+  window.closeValve = () => window.setOut(11, false);
+
+  window.saveSchedule = function () {
+    const on = [], off = [];
+    for (let s = 0; s < 3; s++) {
+      on.push(toMins($('on' + s).value));
+      off.push(toMins($('off' + s).value));
     }
+    patch({ schedOn: '[' + on.join(',') + ']', schedOff: '[' + off.join(',') + ']' });
   };
 
-  function renderState(state) {
-    currentState = state;
-    $('ledStateLabel').textContent = state ? 'ON' : 'OFF';
-    const btn = $('toggleBtn');
-    btn.className = state ? 'on' : 'off';
-    const bulb = document.querySelector('#ledIcon .bulb');
-    if (state) {
-      bulb.style.backgroundColor = '#4CAF50';
-      bulb.style.boxShadow = '0 0 20px #4CAF50, 0 0 40px #4CAF50, 0 0 60px #4CAF50';
-    } else {
-      bulb.style.backgroundColor = '#f44336';
-      bulb.style.boxShadow = '0 0 10px rgba(0,0,0,0.2)';
-    }
+  window.saveClimate = function () {
+    const body = {};
+    const a = parseFloat($('sp1').value), b = parseFloat($('sp2').value), h = parseFloat($('hyst').value);
+    if (Number.isFinite(a)) body.tempSetpoint1 = a;
+    if (Number.isFinite(b)) body.tempSetpoint2 = b;
+    if (Number.isFinite(h)) body.tempHysteresis = h;
+    patch(body);
+  };
+
+  window.saveSiren = function () {
+    const m = parseInt($('sirenMin').value, 10);
+    if (Number.isFinite(m)) patch({ sirenMinutes: Math.max(0, Math.min(60, m)) });
+  };
+
+  window.syncClock = function () {
+    patch({ setDateTimeRequest: Math.floor(Date.now() / 1000) });
+  };
+
+  // ---- render ----
+  function render(d) {
+    state = d;
+    const outs  = parse(d.outputs, []);
+    const zones = parse(d.zones, []);
+    const sw    = parse(d.switches, []);
+
+    // Alarm
+    const armed = !!d.alarmArmed, tripped = !!d.alarmTripped;
+    badge($('armBadge'), tripped ? 'TRIPPED' : (armed ? 'ARMED' : 'DISARMED'),
+          tripped ? 'alm' : (armed ? 'on' : 'off'));
+    $('ackBtn').disabled = !tripped;
+    const bn = $('alarmBanner');
+    if (tripped) {
+      const z = typeof d.alarmTripZone === 'number' ? d.alarmTripZone : -1;
+      const nm = (z >= 0 && zones[z]) ? zones[z].n : 'unknown zone';
+      bn.textContent = 'ALARM - ' + nm + '. Acknowledge to clear and silence.';
+      bn.style.display = '';
+    } else { bn.style.display = 'none'; }
+
+    $('zoneRows').innerHTML = zones.map((z, i) =>
+      '<tr><td>' + z.n + '</td><td class="muted">X' + (9 + i) + '</td>' +
+      '<td><span class="badge ' + (z.open ? 'alm' : 'off') + '">' +
+      (z.open ? 'OPEN' : 'closed') + '</span></td>' +
+      '<td><button class="btn ' + (z.en !== false ? 'btn-on' : 'btn-off') +
+      '" onclick="toggleZone(' + i + ')">' + (z.en !== false ? 'YES' : 'no') +
+      '</button></td></tr>').join('');
+
+    // Lighting Y01-Y08
+    $('lightRows').innerHTML = outs.slice(0, 8).map((o, i) =>
+      '<tr><td>' + o.n + '</td>' +
+      '<td><span class="badge ' + (o.on ? 'on' : 'off') + '">' + (o.on ? 'ON' : 'off') + '</span></td>' +
+      '<td class="muted">X' + String(i + 1).padStart(2, '0') + (sw[i] ? ' &bull;' : '') + '</td>' +
+      '<td><button class="btn btn-on"  onclick="setOut(' + i + ',true)">ON</button></td>' +
+      '<td><button class="btn btn-off" onclick="setOut(' + i + ',false)">OFF</button></td></tr>').join('');
+
+    // Outdoor Y09-Y11
+    const sOn  = parse(d.schedOn, [1080, 1080, 1080]);
+    const sOff = parse(d.schedOff, [1350, 1350, 1350]);
+    $('outdoorRows').innerHTML = outs.slice(8, 11).map((o, i) =>
+      '<tr><td>' + o.n + '</td>' +
+      '<td><span class="badge ' + (o.on ? 'on' : 'off') + '">' + (o.on ? 'ON' : 'off') + '</span></td>' +
+      '<td><input type="time" id="on' + i + '" value="' + hhmm(sOn[i] || 0) + '"></td>' +
+      '<td><input type="time" id="off' + i + '" value="' + hhmm(sOff[i] || 0) + '"></td></tr>').join('');
+
+    // Valve, climate
+    if (outs[11]) badge($('valveBadge'), outs[11].on ? 'OPEN' : 'off', outs[11].on ? 'blue' : 'off');
+    if (outs[12]) badge($('fan1Badge'), outs[12].on ? 'ON' : 'off', outs[12].on ? 'on' : 'off');
+    if (outs[13]) badge($('fan2Badge'), outs[13].on ? 'ON' : 'off', outs[13].on ? 'on' : 'off');
+    $('t1Val').innerHTML = (typeof d.temp1 === 'number')
+      ? d.temp1.toFixed(1) + ' &deg;C' : '<span class="badge alm">no sensor</span>';
+    $('t2Val').innerHTML = (typeof d.temp2 === 'number')
+      ? d.temp2.toFixed(1) + ' &deg;C' : '<span class="badge alm">no sensor</span>';
+
+    // Inputs are not refilled while focused, or typing fights the 3 s poll.
+    const set = (id, v) => { if (document.activeElement !== $(id) && v !== undefined) $(id).value = v; };
+    set('sp1', d.tempSetpoint1); set('sp2', d.tempSetpoint2); set('hyst', d.tempHysteresis);
+    set('valveMin', d.valveRunMinutes); set('sirenMin', d.sirenMinutes);
+
+    // System
+    badge($('inBusBadge'),  d.inBusOk  === false ? 'LOST' : 'OK', d.inBusOk  === false ? 'alm' : 'on');
+    badge($('outBusBadge'), d.outBusOk === false ? 'LOST' : 'OK', d.outBusOk === false ? 'alm' : 'on');
+    $('netVal').textContent = d.network || '-';
+
+    const live = !!d.clockIsLive;
+    $('clockState').textContent = live
+      ? (d.currentEpoch ? new Date(Number(d.currentEpoch) * 1000).toLocaleString() : 'set')
+      : 'NEVER SET - outdoor schedule will not run';
+    $('clockState').style.color = live ? '' : '#B6593F';
+    $('clockBtn').className = 'btn ' + (live ? 'btn-blue' : 'btn-warn');
+
+    $('syncNote').textContent = 'Live';
   }
 
   onAuthStateChanged(auth, (user) => {
@@ -302,27 +560,17 @@
       $('loginScreen').style.display = 'none';
       $('controlScreen').style.display = 'block';
       $('logoutBtn').style.display = '';
-      $('userEmail').textContent = 'Signed in as ' + user.email;
-
-      unsubscribeSnapshot = onSnapshot(stateDocRef, (snap) => {
-        if (snap.exists()) {
-          renderState(!!snap.data().ledState);
-          $('syncNote').textContent = 'Synced with ESP32';
-        } else {
-          // No document yet - the ESP32 hasn't reported in for the first time.
-          renderState(false);
-          $('syncNote').textContent = 'Waiting for ESP32 to come online...';
-        }
-      }, (err) => {
-        $('syncNote').textContent = 'Sync error: ' + err.message;
-      });
+      $('userEmail').textContent = user.email;
+      if (unsub) { unsub(); unsub = null; }
+      unsub = onSnapshot(ref, (snap) => {
+        if (snap.exists()) render(snap.data());
+        else $('syncNote').textContent = 'Waiting for the device to report in...';
+      }, (err) => { $('syncNote').textContent = 'Listener error: ' + err.message; });
     } else {
-      if (unsubscribeSnapshot) { unsubscribeSnapshot(); unsubscribeSnapshot = null; }
+      if (unsub) { unsub(); unsub = null; }
       $('controlScreen').style.display = 'none';
       $('logoutBtn').style.display = 'none';
       $('loginScreen').style.display = 'block';
-      $('emailInput').value = '';
-      $('passwordInput').value = '';
     }
   });
 </script>
