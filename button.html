@@ -194,9 +194,22 @@
      read-only badge, every button is an action with an unambiguous label, and
      nothing clickable reports state. */
   #controlScreen { display: none; max-width: 760px; margin: 0 auto; }
-  .card { background:#FDFBF7; border:1px solid rgba(31,50,25,.11); border-radius:14px;
+  /* ALTERNATING SHADES, set by a class in the markup rather than :nth-child.
+     The cards share #controlScreen with banners and the email line, so any
+     nth- selector would count those too and the alternation would slip by one
+     the moment a banner appeared. If cards are reordered, re-run the
+     alternation - the class is the only thing carrying it. */
+  .card { background:#FAF8F2; border:1px solid rgba(31,50,25,.11); border-radius:14px;
           padding:16px 18px; margin-bottom:14px;
-          box-shadow:0 8px 22px -15px rgba(31,50,25,.35); }
+          box-shadow:0 8px 22px -15px rgba(31,50,25,.35);
+          width:100%; box-sizing:border-box; overflow-wrap:anywhere; }
+  .card.alt { background:#EAF1F4; border-color:rgba(47,111,106,.16); }
+
+  /* Cards are uniform because their width no longer depends on their content
+     fitting. A table too wide to fit scrolls inside this wrapper instead of
+     stretching its card - which is what made Power & solar, and then Garden
+     valve, look wider than their neighbours. */
+  .tw { overflow-x:auto; -webkit-overflow-scrolling:touch; }
   .card h3 { margin:0 0 10px; font-size:.97rem; font-weight:700; color:#1F3219;
              letter-spacing:-.01em; }
   .row { display:flex; align-items:center; justify-content:space-between; gap:10px;
@@ -229,7 +242,9 @@
   .btn:disabled { opacity:.32; cursor:default; }
   input[type=number], input[type=time] {
     padding:5px 7px; border:1px solid #cfd6c8; border-radius:6px;
-    font:inherit; font-size:.82rem; width:5.2em; }
+    font:inherit; font-size:.82rem; width:5.2em; min-width:0; box-sizing:border-box; }
+  input[type=time] { width:6.6em; }
+  table.ctl td, table.ctl th { min-width:0; }
   .muted { color:#8a9184; font-size:.74rem; }
   .alarm-banner { background:#fdecea; color:#B6593F; border-left:4px solid #B6593F;
                   border-radius:8px; padding:11px 14px; font-weight:700;
@@ -293,10 +308,10 @@
           <button class="btn btn-warn" id="ackBtn" onclick="ackAlarm()">ACKNOWLEDGE</button>
         </span>
       </div>
-      <table class="ctl">
+      <div class="tw"><table class="ctl">
         <tr><th>Zone</th><th>Input</th><th>Contact</th><th>Status</th></tr>
         <tbody id="zoneRows"></tbody>
-      </table>
+      </table></div>
       <p class="muted" style="margin:8px 0 0">Zones are normally-open contacts &mdash;
          a <b>closed</b> contact is a trip. The Status button arms or disarms that zone
          on its own; <b>ARM</b> and <b>DISARM</b> above apply to all eight at once.
@@ -308,12 +323,12 @@
          just because nobody was home to hear it.</p>
     </div>
 
-    <div class="card">
+    <div class="card alt">
       <h3>Lighting &amp; sockets</h3>
-      <table class="ctl">
+      <div class="tw"><table class="ctl">
         <tr><th></th><th>Status</th><th>Switch</th><th>ON</th><th>OFF</th></tr>
         <tbody id="lightRows"></tbody>
-      </table>
+      </table></div>
       <p class="muted" style="margin:10px 0 0">Y01&ndash;Y08 follow their wall switch
          X01&ndash;X08 or these buttons. <b>Y09&ndash;Y11 are on a clock</b> &mdash; ON or
          OFF overrides the schedule until its next change, then the clock takes the
@@ -322,10 +337,10 @@
 
     <div class="card">
       <h3>Outdoor lighting times <small class="muted">Y09&ndash;Y11</small></h3>
-      <table class="ctl">
+      <div class="tw"><table class="ctl">
         <tr><th></th><th>On at</th><th>Off at</th></tr>
         <tbody id="outdoorRows"></tbody>
-      </table>
+      </table></div>
       <div class="row">
         <span class="muted">Replaces the analog timers. Windows may cross midnight.</span>
         <span><button class="btn btn-blue" onclick="saveSchedule()">Save times</button></span>
@@ -333,7 +348,7 @@
     </div>
     </div>
 
-    <div class="card">
+    <div class="card alt">
       <h3>Garden valve <small class="muted">Y12</small></h3>
       <div class="row">
         <span>State</span>
@@ -351,10 +366,10 @@
 
       <div style="border-top:1px solid #eceae3;margin-top:12px;padding-top:4px">
       <div style="font-size:.86rem;font-weight:700;color:#2a3a24;margin:4px 0 6px">Irrigation calendar <span class="muted" style="font-weight:400">six weekly slots</span></div>
-      <table class="ctl">
+      <div class="tw"><table class="ctl">
         <tr><th>On</th><th>Days</th><th>Start</th><th>Minutes</th></tr>
         <tbody id="valveSlotRows"></tbody>
-      </table>
+      </table></div>
       <div class="row">
         <span class="muted">A slot opens the valve through the same deadline as a manual
           run &mdash; nothing here can leave it open.</span>
@@ -366,7 +381,7 @@
 
     <div class="card">
       <h3>Climate <small class="muted">TEM1 / TEM2 driving Y13 / Y14</small></h3>
-      <table class="ctl">
+      <div class="tw"><table class="ctl">
         <tr><th></th><th>Reading</th><th>Fan</th><th>Setpoint &deg;C</th></tr>
         <tr><td>Kitchen</td>
           <td id="t1Val">&mdash;</td>
@@ -376,7 +391,7 @@
           <td id="t2Val">&mdash;</td>
           <td><span class="badge off" id="fan2Badge">off</span></td>
           <td><input type="number" id="sp2" min="10" max="50" step="0.5"></td></tr>
-      </table>
+      </table></div>
       <div class="row">
         <span>Kitchen drop-out <input type="number" id="hyst1" min="0.2" max="10" step="0.1"> &deg;C
           below setpoint</span>
@@ -392,9 +407,9 @@
          never runs gets noticed.</p>
     </div>
 
-    <div class="card">
+    <div class="card alt">
       <h3>Power &amp; solar surplus</h3>
-      <table class="ctl">
+      <div class="tw"><table class="ctl">
         <tr><th></th><th>Now</th><th></th><th></th></tr>
         <tr><td>House current</td><td id="ampVal">&mdash;</td>
             <td class="muted" colspan="2">CT clamp on the load feed</td></tr>
@@ -405,7 +420,7 @@
         <tr><td>Surplus</td><td id="surplusVal">&mdash;</td>
             <td><span class="badge off" id="surplusBadge">&mdash;</span></td>
             <td class="muted">Y16</td></tr>
-      </table>
+      </table></div>
 
       <div class="row">
         <span>Switch the surplus load on above <input type="number" id="supOn" min="0" max="10000" step="50"> W</span>
