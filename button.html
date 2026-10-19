@@ -267,6 +267,11 @@
     <div id="userEmail" class="muted" style="text-align:right;margin-bottom:8px"></div>
 
     <div id="alarmBanner" class="alarm-banner" style="display:none"></div>
+    <div id="noDevBanner" class="alarm-banner"
+         style="display:none;background:#eef3ea;color:#3d5c33;border-left-color:#4A7C3F">
+      The board has not reported yet, so the rows below are placeholders and the
+      controls are disabled. Channel names arrive from the device on its first push.
+    </div>
 
     <div class="card">
       <h3>Alarm system</h3>
@@ -607,9 +612,22 @@
   // ---- render ----
   function render(d) {
     state = d;
-    const outs  = parse(d.outputs, []);
-    const zones = parse(d.zones, []);
-    const sw    = parse(d.switches, []);
+    const rawOuts  = parse(d.outputs, []);
+    const rawZones = parse(d.zones, []);
+    const sw       = parse(d.switches, []);
+
+    // Placeholder rows are POSITIONAL - "Y01", "Zone 3 (X11)" - and deliberately
+    // not a copy of the firmware's channel names. A second copy of those names
+    // here would drift the first time one is edited in the sketch, and the page
+    // would then confidently show the wrong label. Positional is never wrong.
+    const hasDevice = rawOuts.length >= 16 && rawZones.length >= 8;
+    const outs = hasDevice ? rawOuts : Array.from({ length: 16 }, (_, i) =>
+      ({ n: 'Y' + String(i + 1).padStart(2, '0'), on: false, m: 0, sw: i < 8 ? i : -1 }));
+    const zones = hasDevice ? rawZones : Array.from({ length: 8 }, (_, i) =>
+      ({ n: 'Zone ' + (i + 1), open: false, armed: false }));
+
+    $('noDevBanner').style.display = hasDevice ? 'none' : '';
+    const dis = hasDevice ? '' : ' disabled';
 
     // Alarm
     const armed = !!d.alarmArmed, tripped = !!d.alarmTripped;
@@ -631,8 +649,8 @@
       return '<tr><td>' + z.n + '</td><td class="muted">X' + (9 + i) + '</td>' +
         '<td><span class="badge ' + (z.open ? 'alm' : 'off') + '">' +
         (z.open ? 'OPEN' : 'closed') + '</span></td>' +
-        '<td><button class="btn ' + (za ? 'btn-warn' : 'btn-on') +
-        '" onclick="toggleZone(' + i + ')">' + (za ? 'ARMED' : 'DISARMED') +
+        '<td><button class="btn ' + (za ? 'btn-warn' : 'btn-on') + '"' + dis +
+        ' onclick="toggleZone(' + i + ')">' + (za ? 'ARMED' : 'DISARMED') +
         '</button></td></tr>';
     }).join('');
 
@@ -644,15 +662,15 @@
       '<tr><td>' + o.n + '</td>' +
       '<td><span class="badge ' + (o.on ? 'on' : 'off') + '">' + (o.on ? 'ON' : 'off') + '</span></td>' +
       '<td class="muted">X' + String(i + 1).padStart(2, '0') + (sw[i] ? ' &bull;' : '') + '</td>' +
-      '<td><button class="btn btn-on"  onclick="setOut(' + i + ',true)">ON</button></td>' +
-      '<td><button class="btn btn-off" onclick="setOut(' + i + ',false)">OFF</button></td></tr>').join('');
+      '<td><button class="btn btn-on"' + dis + ' onclick="setOut(' + i + ',true)">ON</button></td>' +
+      '<td><button class="btn btn-off"' + dis + ' onclick="setOut(' + i + ',false)">OFF</button></td></tr>').join('');
 
     rows += outs.slice(8, 11).map((o, i) =>
       '<tr><td>' + o.n + '</td>' +
       '<td><span class="badge ' + (o.on ? 'on' : 'off') + '">' + (o.on ? 'ON' : 'off') + '</span></td>' +
       '<td class="muted">' + (ov[i] ? 'override' : 'clock') + '</td>' +
-      '<td><button class="btn btn-on"  onclick="setSched(' + i + ',true)">ON</button></td>' +
-      '<td><button class="btn btn-off" onclick="setSched(' + i + ',false)">OFF</button></td></tr>').join('');
+      '<td><button class="btn btn-on"' + dis + ' onclick="setSched(' + i + ',true)">ON</button></td>' +
+      '<td><button class="btn btn-off"' + dis + ' onclick="setSched(' + i + ',false)">OFF</button></td></tr>').join('');
     $('lightRows').innerHTML = rows;
 
     const nOv = ov.filter(v => v !== 0).length;
@@ -672,7 +690,7 @@
     const vsFocus = document.activeElement && /^(ve|vd|vs|vm)/.test(document.activeElement.id || '');
     if (!vsFocus) {
       const DAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
-      const slots = parse(d.valveSlots, []);
+      const slots = parse(d.valveSlots, []);   // absent -> six blank slots below
       let vr = '';
       for (let i = 0; i < 6; i++) {
         const v = slots[i] || { en: false, d: 0, s: 0, m: 15 };
