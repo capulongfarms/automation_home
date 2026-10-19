@@ -283,31 +283,38 @@
         </span>
       </div>
       <table class="ctl">
-        <tr><th>Zone</th><th>Input</th><th>Contact</th><th>Monitored</th></tr>
+        <tr><th>Zone</th><th>Input</th><th>Contact</th><th>Status</th></tr>
         <tbody id="zoneRows"></tbody>
       </table>
       <p class="muted" style="margin:8px 0 0">Zones are normally-open contacts &mdash;
-         a <b>closed</b> contact is a trip. An unmonitored zone is ignored even while armed.</p>
+         a <b>closed</b> contact is a trip. The Status button arms or disarms that zone
+         on its own; <b>ARM</b> and <b>DISARM</b> above apply to all eight at once.
+         A zone trips only when the system <i>and</i> that zone are armed.</p>
     </div>
 
     <div class="card">
-      <h3>Lighting &amp; sockets <small class="muted">Y01&ndash;Y08, wall switches X01&ndash;X08</small></h3>
+      <h3>Lighting &amp; sockets</h3>
       <table class="ctl">
         <tr><th></th><th>Status</th><th>Switch</th><th>ON</th><th>OFF</th></tr>
         <tbody id="lightRows"></tbody>
       </table>
+      <p class="muted" style="margin:10px 0 0">Y01&ndash;Y08 follow their wall switch
+         X01&ndash;X08 or these buttons. <b>Y09&ndash;Y11 are on a clock</b> &mdash; ON or
+         OFF overrides the schedule until its next change, then the clock takes the
+         circuit back. <span id="ovNote"></span></p>
     </div>
 
     <div class="card">
-      <h3>Outdoor lighting <small class="muted">Y09&ndash;Y11, on a clock</small></h3>
+      <h3>Outdoor lighting times <small class="muted">Y09&ndash;Y11</small></h3>
       <table class="ctl">
-        <tr><th></th><th>Status</th><th>On at</th><th>Off at</th></tr>
+        <tr><th></th><th>On at</th><th>Off at</th></tr>
         <tbody id="outdoorRows"></tbody>
       </table>
       <div class="row">
         <span class="muted">Replaces the analog timers. Windows may cross midnight.</span>
         <span><button class="btn btn-blue" onclick="saveSchedule()">Save times</button></span>
       </div>
+    </div>
     </div>
 
     <div class="card">
@@ -328,6 +335,19 @@
     </div>
 
     <div class="card">
+      <h3>Irrigation calendar <small class="muted">six weekly slots</small></h3>
+      <table class="ctl">
+        <tr><th>On</th><th>Days</th><th>Start</th><th>Minutes</th></tr>
+        <tbody id="valveSlotRows"></tbody>
+      </table>
+      <div class="row">
+        <span class="muted">A slot opens the valve through the same deadline as a manual
+          run &mdash; nothing here can leave it open.</span>
+        <span><button class="btn btn-blue" onclick="saveValveSlots()">Save calendar</button></span>
+      </div>
+    </div>
+
+    <div class="card">
       <h3>Climate <small class="muted">TEM1 / TEM2 driving Y13 / Y14</small></h3>
       <table class="ctl">
         <tr><th></th><th>Reading</th><th>Fan</th><th>Setpoint &deg;C</th></tr>
@@ -341,7 +361,13 @@
           <td><input type="number" id="sp2" min="10" max="50" step="0.5"></td></tr>
       </table>
       <div class="row">
-        <span>Drop-out below setpoint by <input type="number" id="hyst" min="0.2" max="10" step="0.1"> &deg;C</span>
+        <span>Kitchen drop-out <input type="number" id="hyst1" min="0.2" max="10" step="0.1"> &deg;C
+          below setpoint</span>
+        <span class="muted">cooking heat spikes and clears fast</span>
+      </div>
+      <div class="row">
+        <span>Family room drop-out <input type="number" id="hyst2" min="0.2" max="10" step="0.1"> &deg;C
+          below setpoint</span>
         <span><button class="btn btn-blue" onclick="saveClimate()">Save</button></span>
       </div>
       <p class="muted" style="margin:8px 0 0">A sensor reading nothing holds its fan
@@ -490,14 +516,39 @@
     patch({ setOutputs: s });
   };
 
+  // The whole eight-zone picture every time, for the same reason setOutputs
+  // sends all sixteen: the page knows every zone's state, so sending one would
+  // mean inventing the other seven.
   window.toggleZone = function (z) {
     const zones = parse(state.zones, []);
     let s = '';
     for (let k = 0; k < 8; k++) {
-      const cur = zones[k] ? zones[k].en !== false : true;
+      const cur = zones[k] ? zones[k].armed !== false : true;
       s += (k === z ? (cur ? '0' : '1') : (cur ? '1' : '0'));
     }
-    patch({ zoneEnabled: s });
+    patch({ setZoneArmed: s });
+  };
+
+  // Y09-Y11 are clock-driven, so ON/OFF here is an override rather than a
+  // plain write - the device releases it at the schedule's next transition.
+  window.setSched = function (i, want) {
+    const ov = parse(state.schedOverride, [0, 0, 0]);
+    ov[i] = want ? 1 : -1;
+    patch({ setSchedOverride: '[' + ov.join(',') + ']' });
+  };
+
+  window.saveValveSlots = function () {
+    let out = '';
+    for (let i = 0; i < 6; i++) {
+      let days = 0;
+      for (let d = 0; d < 7; d++) if ($('vd' + i + '_' + d).checked) days |= (1 << d);
+      const st = (($('vs' + i).value || '00:00').split(':'));
+      const mins = parseInt(st[0], 10) * 60 + parseInt(st[1], 10);
+      const dur = parseInt($('vm' + i).value, 10) || 0;
+      out += ($('ve' + i).checked ? 1 : 0) + ',' + days + ',' +
+             (Number.isFinite(mins) ? mins : 0) + ',' + dur + ';';
+    }
+    patch({ valveSlots: out });
   };
 
   window.openValve = function () {
@@ -517,10 +568,12 @@
 
   window.saveClimate = function () {
     const body = {};
-    const a = parseFloat($('sp1').value), b = parseFloat($('sp2').value), h = parseFloat($('hyst').value);
-    if (Number.isFinite(a)) body.tempSetpoint1 = a;
-    if (Number.isFinite(b)) body.tempSetpoint2 = b;
-    if (Number.isFinite(h)) body.tempHysteresis = h;
+    const a = parseFloat($('sp1').value), b = parseFloat($('sp2').value);
+    const h1 = parseFloat($('hyst1').value), h2 = parseFloat($('hyst2').value);
+    if (Number.isFinite(a))  body.tempSetpoint1 = a;
+    if (Number.isFinite(b))  body.tempSetpoint2 = b;
+    if (Number.isFinite(h1)) body.tempHyst1 = h1;
+    if (Number.isFinite(h2)) body.tempHyst2 = h2;
     patch(body);
   };
 
@@ -571,30 +624,69 @@
       bn.style.display = '';
     } else { bn.style.display = 'none'; }
 
-    $('zoneRows').innerHTML = zones.map((z, i) =>
-      '<tr><td>' + z.n + '</td><td class="muted">X' + (9 + i) + '</td>' +
-      '<td><span class="badge ' + (z.open ? 'alm' : 'off') + '">' +
-      (z.open ? 'OPEN' : 'closed') + '</span></td>' +
-      '<td><button class="btn ' + (z.en !== false ? 'btn-on' : 'btn-off') +
-      '" onclick="toggleZone(' + i + ')">' + (z.en !== false ? 'YES' : 'no') +
-      '</button></td></tr>').join('');
+    // RED means armed, GREEN means disarmed - the owner's convention, and the
+    // opposite of the usual "green is good". Armed is the state that bites.
+    $('zoneRows').innerHTML = zones.map((z, i) => {
+      const za = z.armed !== false;
+      return '<tr><td>' + z.n + '</td><td class="muted">X' + (9 + i) + '</td>' +
+        '<td><span class="badge ' + (z.open ? 'alm' : 'off') + '">' +
+        (z.open ? 'OPEN' : 'closed') + '</span></td>' +
+        '<td><button class="btn ' + (za ? 'btn-warn' : 'btn-on') +
+        '" onclick="toggleZone(' + i + ')">' + (za ? 'ARMED' : 'DISARMED') +
+        '</button></td></tr>';
+    }).join('');
 
-    // Lighting Y01-Y08
-    $('lightRows').innerHTML = outs.slice(0, 8).map((o, i) =>
+    // Lighting Y01-Y08 and the three outdoor circuits Y09-Y11, one table.
+    // The outdoor rows show "clock" in the switch column rather than an X
+    // input, because no wall switch drives them.
+    const ov = parse(d.schedOverride, [0, 0, 0]);
+    let rows = outs.slice(0, 8).map((o, i) =>
       '<tr><td>' + o.n + '</td>' +
       '<td><span class="badge ' + (o.on ? 'on' : 'off') + '">' + (o.on ? 'ON' : 'off') + '</span></td>' +
       '<td class="muted">X' + String(i + 1).padStart(2, '0') + (sw[i] ? ' &bull;' : '') + '</td>' +
       '<td><button class="btn btn-on"  onclick="setOut(' + i + ',true)">ON</button></td>' +
       '<td><button class="btn btn-off" onclick="setOut(' + i + ',false)">OFF</button></td></tr>').join('');
 
-    // Outdoor Y09-Y11
+    rows += outs.slice(8, 11).map((o, i) =>
+      '<tr><td>' + o.n + '</td>' +
+      '<td><span class="badge ' + (o.on ? 'on' : 'off') + '">' + (o.on ? 'ON' : 'off') + '</span></td>' +
+      '<td class="muted">' + (ov[i] ? 'override' : 'clock') + '</td>' +
+      '<td><button class="btn btn-on"  onclick="setSched(' + i + ',true)">ON</button></td>' +
+      '<td><button class="btn btn-off" onclick="setSched(' + i + ',false)">OFF</button></td></tr>').join('');
+    $('lightRows').innerHTML = rows;
+
+    const nOv = ov.filter(v => v !== 0).length;
+    $('ovNote').textContent = nOv
+      ? nOv + ' circuit' + (nOv > 1 ? 's' : '') + ' currently overridden.' : '';
+
+    // Outdoor times
     const sOn  = parse(d.schedOn, [1080, 1080, 1080]);
     const sOff = parse(d.schedOff, [1350, 1350, 1350]);
     $('outdoorRows').innerHTML = outs.slice(8, 11).map((o, i) =>
       '<tr><td>' + o.n + '</td>' +
-      '<td><span class="badge ' + (o.on ? 'on' : 'off') + '">' + (o.on ? 'ON' : 'off') + '</span></td>' +
       '<td><input type="time" id="on' + i + '" value="' + hhmm(sOn[i] || 0) + '"></td>' +
       '<td><input type="time" id="off' + i + '" value="' + hhmm(sOff[i] || 0) + '"></td></tr>').join('');
+
+    // Irrigation calendar. Rebuilt only when nothing in it has focus, or the
+    // 3 s poll would wipe a half-typed row out from under you.
+    const vsFocus = document.activeElement && /^(ve|vd|vs|vm)/.test(document.activeElement.id || '');
+    if (!vsFocus) {
+      const DAY = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
+      const slots = parse(d.valveSlots, []);
+      let vr = '';
+      for (let i = 0; i < 6; i++) {
+        const v = slots[i] || { en: false, d: 0, s: 0, m: 15 };
+        let days = '';
+        for (let k = 0; k < 7; k++)
+          days += '<label style="margin-right:3px"><input type="checkbox" id="vd' + i + '_' + k +
+                  '"' + ((v.d >> k) & 1 ? ' checked' : '') + '> ' + DAY[k] + '</label>';
+        vr += '<tr><td><input type="checkbox" id="ve' + i + '"' + (v.en ? ' checked' : '') + '></td>' +
+              '<td style="font-size:.74rem">' + days + '</td>' +
+              '<td><input type="time" id="vs' + i + '" value="' + hhmm(v.s || 0) + '"></td>' +
+              '<td><input type="number" id="vm' + i + '" min="1" max="240" value="' + (v.m || 15) + '"></td></tr>';
+      }
+      $('valveSlotRows').innerHTML = vr;
+    }
 
     // Valve, climate
     if (outs[11]) badge($('valveBadge'), outs[11].on ? 'OPEN' : 'off', outs[11].on ? 'blue' : 'off');
@@ -607,7 +699,8 @@
 
     // Inputs are not refilled while focused, or typing fights the 3 s poll.
     const set = (id, v) => { if (document.activeElement !== $(id) && v !== undefined) $(id).value = v; };
-    set('sp1', d.tempSetpoint1); set('sp2', d.tempSetpoint2); set('hyst', d.tempHysteresis);
+    set('sp1', d.tempSetpoint1); set('sp2', d.tempSetpoint2);
+    set('hyst1', d.tempHyst1); set('hyst2', d.tempHyst2);
     set('valveMin', d.valveRunMinutes); set('sirenMin', d.sirenMinutes);
     set('supOn', d.surplusOnW); set('supOff', d.surplusOffW);
     set('supOnD', d.surplusOnDelayS); set('supOffD', d.surplusOffDelayS);
