@@ -350,6 +350,58 @@
     </div>
 
     <div class="card">
+      <h3>Power &amp; solar surplus</h3>
+      <table class="ctl">
+        <tr><th></th><th>Now</th><th></th><th></th></tr>
+        <tr><td>House current</td><td id="ampVal">&mdash;</td>
+            <td class="muted" colspan="2">CT clamp on the load feed</td></tr>
+        <tr><td>House load</td><td id="vaVal">&mdash;</td>
+            <td class="muted" colspan="2">apparent power &mdash; see note</td></tr>
+        <tr><td>Solar generation</td><td id="solarVal">&mdash;</td>
+            <td class="muted" colspan="2">from the inverter, not measured here</td></tr>
+        <tr><td>Surplus</td><td id="surplusVal">&mdash;</td>
+            <td><span class="badge off" id="surplusBadge">&mdash;</span></td>
+            <td class="muted">Y16</td></tr>
+      </table>
+
+      <div class="row">
+        <span>Switch the surplus load on above <input type="number" id="supOn" min="0" max="10000" step="50"> W</span>
+        <span class="muted">after <input type="number" id="supOnD" min="0" max="3600" step="30"> s</span>
+      </div>
+      <div class="row">
+        <span>Switch it off below <input type="number" id="supOff" min="0" max="10000" step="50"> W</span>
+        <span class="muted">after <input type="number" id="supOffD" min="0" max="3600" step="30"> s</span>
+      </div>
+      <div class="row">
+        <span>Nominal mains <input type="number" id="mainsV" min="90" max="260" step="1"> V</span>
+        <span><button class="btn btn-blue" onclick="saveSurplus()">Save</button></span>
+      </div>
+      <div class="row">
+        <span style="flex:1">Inverter URL
+          <input type="text" id="solarUrl" placeholder="http://opendtu.local/api/livedata/status"
+                 style="width:100%;max-width:330px;padding:5px 7px;border:1px solid #cfd6c8;border-radius:6px;font:inherit;font-size:.8rem">
+        </span>
+      </div>
+      <div class="row">
+        <span>JSON key <input type="text" id="solarKey" style="width:7em;padding:5px 7px;border:1px solid #cfd6c8;border-radius:6px;font:inherit;font-size:.8rem"></span>
+        <span><button class="btn btn-blue" onclick="saveSolarSource()">Save source</button></span>
+      </div>
+
+      <p class="muted" style="margin:8px 0 0">
+        <b>A CT clamp cannot tell import from export</b> &mdash; it measures the size of the
+        current and nothing else, so 5&nbsp;A going out to the grid reads the same as
+        5&nbsp;A coming in. The clamp therefore goes on the <b>house load feed</b>,
+        downstream of the solar tie-in, and measures consumption only; generation comes
+        from the inverter and surplus is the subtraction.
+        <b>House load is VA, not W</b>: mains voltage and power factor are not measured.
+        Good enough to decide whether to run a load, wrong for billing.
+        Leave the URL blank to feed generation in by writing <code>solarGenerationW</code>
+        instead. Either way it must keep arriving &mdash; a figure older than 2½ minutes
+        is treated as unknown, and <b>unknown switches the load off, never on</b>.
+      </p>
+    </div>
+
+    <div class="card">
       <h3>System</h3>
       <div class="row"><span>Device clock <b id="clockState">&mdash;</b></span>
         <span><button class="btn btn-blue" id="clockBtn" onclick="syncClock()">Sync from this browser</button></span></div>
@@ -472,6 +524,24 @@
     patch(body);
   };
 
+  window.saveSurplus = function () {
+    const body = {};
+    const num = (id, key, lo, hi) => {
+      const v = parseFloat($(id).value);
+      if (Number.isFinite(v)) body[key] = Math.max(lo, Math.min(hi, v));
+    };
+    num('supOn',  'surplusOnW',       0, 10000);
+    num('supOff', 'surplusOffW',      0, 10000);
+    num('supOnD', 'surplusOnDelayS',  0, 3600);
+    num('supOffD','surplusOffDelayS', 0, 3600);
+    num('mainsV', 'mainsVolts',      90, 260);
+    patch(body);
+  };
+
+  window.saveSolarSource = function () {
+    patch({ solarUrl: $('solarUrl').value.trim(), solarKey: $('solarKey').value.trim() });
+  };
+
   window.saveSiren = function () {
     const m = parseInt($('sirenMin').value, 10);
     if (Number.isFinite(m)) patch({ sirenMinutes: Math.max(0, Math.min(60, m)) });
@@ -539,6 +609,29 @@
     const set = (id, v) => { if (document.activeElement !== $(id) && v !== undefined) $(id).value = v; };
     set('sp1', d.tempSetpoint1); set('sp2', d.tempSetpoint2); set('hyst', d.tempHysteresis);
     set('valveMin', d.valveRunMinutes); set('sirenMin', d.sirenMinutes);
+    set('supOn', d.surplusOnW); set('supOff', d.surplusOffW);
+    set('supOnD', d.surplusOnDelayS); set('supOffD', d.surplusOffDelayS);
+    set('mainsV', d.mainsVolts);
+    set('solarUrl', d.solarUrl); set('solarKey', d.solarKey);
+
+    // Power. Each figure is shown only when it exists - a dash is honest, a
+    // zero would read as a measurement.
+    $('ampVal').innerHTML = (typeof d.mainsAmps === 'number')
+      ? d.mainsAmps.toFixed(2) + ' A'
+      : (d.adsOk === false ? '<span class="badge alm">no ADS1115</span>'
+                           : '<span class="badge off">no CT</span>');
+    $('vaVal').textContent    = (typeof d.houseVA === 'number') ? Math.round(d.houseVA) + ' VA' : '-';
+    $('solarVal').innerHTML   = (typeof d.solarW === 'number' && d.solarFresh)
+      ? Math.round(d.solarW) + ' W' : '<span class="badge off">no data</span>';
+
+    const sOut = outs[15];
+    if (typeof d.surplusW === 'number') {
+      $('surplusVal').textContent = Math.round(d.surplusW) + ' W';
+      badge($('surplusBadge'), sOut && sOut.on ? 'RUNNING' : 'idle', sOut && sOut.on ? 'on' : 'off');
+    } else {
+      $('surplusVal').textContent = 'unknown';
+      badge($('surplusBadge'), 'HELD OFF', 'off');
+    }
 
     // System
     badge($('inBusBadge'),  d.inBusOk  === false ? 'LOST' : 'OK', d.inBusOk  === false ? 'alm' : 'on');
