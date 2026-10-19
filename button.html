@@ -61,7 +61,6 @@
   }
 
   /* ---------- Control screen ---------- */
-  #controlScreen { display: none; text-align: center; }
 
   #ledIcon { width: 60px; height: 100px; margin: 20px auto; position: relative; }
   #ledIcon .bulb {
@@ -202,6 +201,13 @@
              letter-spacing:-.01em; }
   .row { display:flex; align-items:center; justify-content:space-between; gap:10px;
          padding:7px 0; border-top:1px solid #eceae3; font-size:.88rem; }
+  /* A flex item defaults to min-width:auto, so it refuses to shrink below its
+     own content. One long placeholder URL was therefore widening its row past
+     the card - which is why Power & solar looked twice the width of everything
+     else. Allowing the shrink is the whole fix; the card was never wider. */
+  .row > * { min-width: 0; }
+  .card { width: 100%; box-sizing: border-box; overflow-wrap: anywhere; }
+  table.ctl { max-width: 100%; }
   .row:first-of-type { border-top:0; }
   .badge { padding:3px 9px; border-radius:11px; color:#fff; font-weight:700;
            font-size:.68rem; letter-spacing:.03em; }
@@ -295,6 +301,11 @@
          a <b>closed</b> contact is a trip. The Status button arms or disarms that zone
          on its own; <b>ARM</b> and <b>DISARM</b> above apply to all eight at once.
          A zone trips only when the system <i>and</i> that zone are armed.</p>
+      <div class="row"><span>Siren runs for <input type="number" id="sirenMin" min="0" max="60" step="1"> min</span>
+        <span><button class="btn btn-blue" onclick="saveSiren()">Save</button></span></div>
+      <p class="muted" style="margin:8px 0 0">The siren self-silences after this;
+         the alarm itself stays latched until acknowledged, so a trip is never lost
+         just because nobody was home to hear it.</p>
     </div>
 
     <div class="card">
@@ -337,10 +348,9 @@
       </div>
       <p class="muted" style="margin:8px 0 0">Every open carries a deadline. A valve left
          open is the one fault here that empties a tank, so there is no indefinite open.</p>
-    </div>
 
-    <div class="card">
-      <h3>Irrigation calendar <small class="muted">six weekly slots</small></h3>
+      <div style="border-top:1px solid #eceae3;margin-top:12px;padding-top:4px">
+      <div style="font-size:.86rem;font-weight:700;color:#2a3a24;margin:4px 0 6px">Irrigation calendar <span class="muted" style="font-weight:400">six weekly slots</span></div>
       <table class="ctl">
         <tr><th>On</th><th>Days</th><th>Start</th><th>Minutes</th></tr>
         <tbody id="valveSlotRows"></tbody>
@@ -350,7 +360,9 @@
           run &mdash; nothing here can leave it open.</span>
         <span><button class="btn btn-blue" onclick="saveValveSlots()">Save calendar</button></span>
       </div>
+      </div>
     </div>
+
 
     <div class="card">
       <h3>Climate <small class="muted">TEM1 / TEM2 driving Y13 / Y14</small></h3>
@@ -407,11 +419,11 @@
         <span>Nominal mains <input type="number" id="mainsV" min="90" max="260" step="1"> V</span>
         <span><button class="btn btn-blue" onclick="saveSurplus()">Save</button></span>
       </div>
-      <div class="row">
-        <span style="flex:1">Inverter URL
-          <input type="text" id="solarUrl" placeholder="http://opendtu.local/api/livedata/status"
-                 style="width:100%;max-width:330px;padding:5px 7px;border:1px solid #cfd6c8;border-radius:6px;font:inherit;font-size:.8rem">
-        </span>
+      <div style="padding:7px 0;border-top:1px solid #eceae3">
+        <div style="font-size:.88rem;margin-bottom:4px">Inverter URL</div>
+        <input type="text" id="solarUrl" placeholder="http://opendtu.local/api/livedata/status"
+               style="width:100%;box-sizing:border-box;padding:6px 8px;border:1px solid #cfd6c8;
+                      border-radius:6px;font:inherit;font-size:.8rem">
       </div>
       <div class="row">
         <span>JSON key <input type="text" id="solarKey" style="width:7em;padding:5px 7px;border:1px solid #cfd6c8;border-radius:6px;font:inherit;font-size:.8rem"></span>
@@ -441,8 +453,6 @@
       <div class="row"><span>Output expanders <small class="muted">0x24 / 0x25</small></span>
         <span><span class="badge off" id="outBusBadge">&mdash;</span></span></div>
       <div class="row"><span>Network</span><span id="netVal" class="muted">&mdash;</span></div>
-      <div class="row"><span>Siren runs for <input type="number" id="sirenMin" min="0" max="60" step="1"> min</span>
-        <span><button class="btn btn-blue" onclick="saveSiren()">Save</button></span></div>
       <p class="muted" style="margin:8px 0 0">The siren self-silences; the alarm stays
          latched until acknowledged. NTP is blocked on this carrier, so the clock comes
          from the browser &mdash; without it the outdoor schedule never runs.</p>
