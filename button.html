@@ -416,6 +416,10 @@
             <td class="muted" colspan="2">apparent power &mdash; see note</td></tr>
         <tr><td>Solar generation</td><td id="solarVal">&mdash;</td>
             <td class="muted" colspan="2">from the inverter, not measured here</td></tr>
+        <tr><td>Inverter contact <small class="muted">TEM3</small></td>
+            <td id="contactVal">&mdash;</td>
+            <td><button class="btn btn-off" id="contactBtn" onclick="toggleContact()">USE</button></td>
+            <td class="muted">inverter DO1</td></tr>
         <tr><td>Surplus</td><td id="surplusVal">&mdash;</td>
             <td><span class="badge off" id="surplusBadge">&mdash;</span></td>
             <td class="muted">Y16</td></tr>
@@ -620,6 +624,13 @@
     patch(body);
   };
 
+  // The inverter's own verdict, when wired. Opt-in because an open contact and
+  // an unwired terminal read identically - the board cannot tell "no surplus"
+  // from "nothing connected", so it has to be told the contact is there.
+  window.toggleContact = function () {
+    patch({ solarContactEnabled: !(state && state.solarContactEnabled) });
+  };
+
   window.saveSolarSource = function () {
     patch({ solarUrl: $('solarUrl').value.trim(), solarKey: $('solarKey').value.trim() });
   };
@@ -758,6 +769,14 @@
     $('vaVal').textContent    = (typeof d.houseVA === 'number') ? Math.round(d.houseVA) + ' VA' : '-';
     $('solarVal').innerHTML   = (typeof d.solarW === 'number' && d.solarFresh)
       ? Math.round(d.solarW) + ' W' : '<span class="badge off">no data</span>';
+
+    const useC = !!d.solarContactEnabled;
+    $('contactVal').innerHTML = useC
+      ? (d.solarContactClosed ? '<span class="badge on">SURPLUS</span>'
+                              : '<span class="badge off">open</span>')
+      : '<span class="badge off">not used</span>';
+    $('contactBtn').textContent = useC ? 'IGNORE' : 'USE';
+    $('contactBtn').className = 'btn ' + (useC ? 'btn-on' : 'btn-off');
 
     const sOut = outs[15];
     if (typeof d.surplusW === 'number') {
