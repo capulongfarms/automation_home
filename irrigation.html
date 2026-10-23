@@ -594,6 +594,29 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
           <span><input type="number" id="levelMinInput" step="1" min="0" max="100"> %</span>
         </div>
         <div class="row">
+          <span>Zones per cycle</span>
+          <span><select id="zonesPerBatchInput" onchange="saveZonesPerBatch()" style="width:4.5em">
+                  <option value="1">1</option>
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                </select></span>
+        </div>
+        <div class="row">
+          <span style="font-size:12px;opacity:.75">How many zones open together in one cycle before
+          handing over make-before-break to the next group. <b>Saves immediately &mdash; no Save
+          button.</b> A job of two or more zones never runs fewer than two at a time whatever this
+          says: one open valve is one point of failure between a running pump and a closed system,
+          so 1 only ever applies to a single-zone job.</span>
+          <span></span>
+        </div>
+        <div class="row" id="batchWarnRow" style="display:none">
+          <span id="batchWarn" style="font-size:12px"></span>
+          <span></span>
+        </div>
+        <div class="row">
           <span>Rain sensor reading <small id="rainPctLive" style="opacity:.75">&mdash;</small></span>
           <span><input type="number" id="rainOnInput" step="1" min="0" max="100" title="rain starts at or above">
                 <input type="number" id="rainOffInput" step="1" min="0" max="100" title="rain stops below"> %
@@ -775,13 +798,22 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
           <span><input type="number" id="runMinInput" value="15" min="1" max="240"> min</span>
         </div>
         <div class="row">
-          <span>Max zones open at once</span>
-          <span><input type="number" id="vMaxConInput" min="0" max="6" step="1" style="width:4em"></span>
+          <span>Max zones open at once <small id="nodeCapLive" style="opacity:.75">&mdash;</small></span>
+          <span><select id="vMaxConInput" style="width:4.5em">
+                  <option value="2">2</option>
+                  <option value="3">3</option>
+                  <option value="4">4</option>
+                  <option value="5">5</option>
+                  <option value="6">6</option>
+                </select></span>
         </div>
         <div class="row">
           <span style="font-size:12px;opacity:.75">Open zones share the pump's flow, so each one
           drops below its design pressure &mdash; and these solenoids hold current the whole time
-          they are open. <b>0 removes the limit entirely.</b></span>
+          they are open. <b>The floor is 2, not 0.</b> &quot;No limit&quot; is gone: a second open
+          zone is the relief path if the first valve fails to open physically, and a
+          make-before-break handover needs two open at once. Keep this at
+          <b>twice the Headend's zones per cycle</b> or handovers cannot overlap.</span>
           <span></span>
         </div>
         <div class="row" style="border-top:1px solid rgba(255,255,255,.12);padding-top:10px">
@@ -857,7 +889,7 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   // is. Pages serves this file with a cache lifetime, so a browser can sit on
   // an old copy long after a fix is deployed, and a stale page is
   // indistinguishable from a broken device. BUMP THIS on every change here.
-  const PAGE_VERSION = '2026-10-23a';
+  const PAGE_VERSION = '2026-10-23b';
 
   let schedule = [];
   // An edit takes a pull PLUS a push to come back - up to about eight seconds.
@@ -1601,6 +1633,8 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
 
     if (document.activeElement !== $('pressureTripInput')) $('pressureTripInput').value = data.pressureTripBar ?? 6;
     if (document.activeElement !== $('levelMinInput')) $('levelMinInput').value = data.levelMinPercent ?? 15;
+    if (document.activeElement !== $('zonesPerBatchInput'))
+      $('zonesPerBatchInput').value = String(data.zonesPerBatch ?? 2);
     // NO hardcoded fallback. These used to default to 75/70, which was a third
     // copy of a value that also lived at the firmware declaration and in its
     // NVS load - so when the device moved to 86/83 the page calmly displayed
@@ -1749,9 +1783,22 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     el.textContent = s.headLink ? 'ALIVE' : 'LOST';
     el.className = 'badge ' + (s.headLink ? 'on' : 'alm');
 
-    if (document.activeElement !== $('vMaxConInput') &&
-        typeof s.valveMaxConcurrent === 'number') {
-      $('vMaxConInput').value = s.valveMaxConcurrent;
+    // The dropdown only offers 2-6, because that is the range the Node
+    // firmware now accepts. A Node still running an older build can report 0
+    // or 1, and assigning that to a <select> silently blanks it - which reads
+    // as nothing being set rather than as something out of range. So echo the
+    // number the Node actually reports, and only move the dropdown when it is
+    // a value the dropdown can hold.
+    if (typeof s.valveMaxConcurrent === 'number') {
+      const cap = s.valveMaxConcurrent;
+      const inRange = cap >= 2 && cap <= 6;
+      $('nodeCapLive').textContent = inRange
+        ? '(node reports ' + cap + ')'
+        : '(node reports ' + cap + ' \u2014 older build, it will lift to 2)';
+      if (inRange && document.activeElement !== $('vMaxConInput'))
+        $('vMaxConInput').value = String(cap);
+    } else {
+      $('nodeCapLive').textContent = '\u2014';
     }
     ['soilDry0', 'soilWet0', 'soilDry1', 'soilWet1'].forEach(k => {
       const v = s[k];
@@ -1817,6 +1864,7 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     }
     renderHeadend();
     renderNode();
+    updateBatchWarning();
     renderTabDots();
 
     if (headState && headState.clockIsLive === false) {
@@ -1953,6 +2001,80 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     }, 'Thresholds saved');
   };
 
+  // Saves on change rather than behind the Save button next to the rain
+  // thresholds. It is one discrete value, and pairing it with a button that
+  // also writes four unrelated numbers makes it easy to move the dropdown,
+  // walk away, and never have written anything.
+  window.saveZonesPerBatch = function () {
+    const n = parseInt($('zonesPerBatchInput').value, 10);
+    if (!Number.isFinite(n)) return;
+    patch(headDocRef, { zonesPerBatch: Math.min(6, Math.max(1, n)) },
+          'Zones per cycle set to ' + n);
+  };
+
+  // ------------------------------------------------------------------------
+  // THE ONE CHECK NEITHER BOARD CAN MAKE ON ITS OWN.
+  //
+  // The batch size lives on the Headend document and the cap lives on the
+  // Node document. The Headend only learns the cap when it arrives over LoRa
+  // in the Node's "mx" field, and the Node never learns the batch size at
+  // all. This page is the only place both numbers are visible at once, so it
+  // is the only place the mismatch can be shown BEFORE a job runs instead of
+  // discovered in the serial log afterwards.
+  //
+  // A handover holds the OUTGOING and INCOMING groups open together, so the
+  // cap must be at least twice the batch size. Below that the Headend refuses
+  // the overlap and falls back to break-before-make: never unsafe, but the
+  // pump stops and restarts between groups, which is the exact behaviour the
+  // batching work existed to remove.
+  // ------------------------------------------------------------------------
+  function updateBatchWarning() {
+    const row = $('batchWarnRow'), el = $('batchWarn');
+    // Same default as the dropdown. The device does not publish this field -
+    // the page owns it - so it is absent until first written, and reading it
+    // as "unknown" here would hide the note while the dropdown plainly showed
+    // a number. Both have to agree on what absent means.
+    if (!headState) { row.style.display = 'none'; return; }
+    const batch = (typeof headState.zonesPerBatch === 'number')
+                    ? headState.zonesPerBatch : 2;
+    const cap = nodeState && nodeState.valveMaxConcurrent;
+
+    if (typeof cap !== 'number') {
+      row.style.display = '';
+      el.style.color = '#ffd79a';
+      el.innerHTML = '<b>Note</b> &mdash; the node has not reported its valve limit yet, ' +
+        'so the headend cannot tell whether a make-before-break handover will fit. ' +
+        'It will assume it does.';
+      return;
+    }
+
+    const need = batch * 2;
+    if (batch > 1 && cap < need) {
+      row.style.display = '';
+      el.style.color = '#ffb4a2';
+      el.innerHTML = '<b>Warning &mdash; handovers will not overlap.</b> ' + batch +
+        ' zones per cycle needs the node to allow <b>' + need + '</b> open at once; ' +
+        'it allows <b>' + cap + '</b>. The pump will stop and restart between groups ' +
+        'instead of handing over. Raise &quot;Max zones open at once&quot; to ' + need +
+        ' on the Node tab.';
+      return;
+    }
+
+    if (batch === 1) {
+      row.style.display = '';
+      el.style.color = '#ffd79a';
+      el.innerHTML = '<b>Note</b> &mdash; 1 per cycle only applies to a single-zone job. ' +
+        'Two or more zones are raised to 2 at a time, so one sticking valve still ' +
+        'leaves the pump somewhere to push.';
+      return;
+    }
+
+    row.style.display = '';
+    el.style.color = '#9fe0b0';
+    el.innerHTML = 'Handover overlap fits &mdash; ' + batch + ' per cycle needs ' + need +
+      ' open at once and the node allows ' + cap + '. The pump runs straight through.';
+  }
+
   function setValve(zone, open) {
     const mins = open ? Math.min(parseInt($('runMinInput').value) || 15, 240) : 0;
     // Encoded as zone * 10000 + minutes (0 minutes = close) so one integer
@@ -1970,7 +2092,11 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     // matters - it is the last writer before the veto reads it - but catching
     // it here means the box cannot quietly hold a number the Node refused.
     const vmc = parseInt($('vMaxConInput').value, 10);
-    if (Number.isFinite(vmc)) body.valveMaxConcurrent = Math.min(6, Math.max(0, vmc));
+    // Floor of 2, not 0. "No limit" no longer exists on the Node either: at
+    // least two zones must be permittable so a valve that fails to open
+    // physically still leaves the pump somewhere to push, and so the
+    // Headend's make-before-break handover can hold two open at once.
+    if (Number.isFinite(vmc)) body.valveMaxConcurrent = Math.min(6, Math.max(2, vmc));
     // Only send calibration values that are actually filled in - a blank field
     // must not write NaN over a good calibration.
     ['soilDry0', 'soilWet0', 'soilDry1', 'soilWet1'].forEach(k => {
