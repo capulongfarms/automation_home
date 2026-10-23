@@ -570,8 +570,8 @@
   window.signOutUser = async function () { await signOut(auth); };
 
   // ---- actions ----
-  window.setArmed = (on) => patch({ alarmArmRequest: on });
-  window.ackAlarm = () => patch({ alarmAckRequest: true });
+  window.setArmed = (on) => patch({ alarmArmRequest: on }, on ? 'Arming all zones' : 'Disarming');
+  window.ackAlarm = () => patch({ alarmAckRequest: true }, 'Alarm acknowledged');
 
   // setOutputs is the full 16-channel picture every time, because the device
   // compares it against what it already has and only acts on MANUAL channels.
@@ -604,7 +604,8 @@
   window.setSched = function (i, want) {
     const ov = parse(state.schedOverride, [0, 0, 0]);
     ov[i] = want ? 1 : -1;
-    patch({ setSchedOverride: '[' + ov.join(',') + ']' });
+    patch({ setSchedOverride: '[' + ov.join(',') + ']' },
+          want ? 'Override ON until the next scheduled change' : 'Override OFF until the next scheduled change');
   };
 
   // Attribute-safe: these go straight into a value="..." in generated markup.
@@ -646,7 +647,7 @@
       out += ($('ve' + i).checked ? 1 : 0) + ',' + days + ',' +
              (Number.isFinite(mins) ? mins : 0) + ',' + dur + ';';
     }
-    patch({ valveSlots: out });
+    patch({ valveSlots: out }, 'Irrigation calendar saved');
   };
 
   window.openValve = function () {
@@ -661,7 +662,8 @@
       on.push(toMins($('on' + s).value));
       off.push(toMins($('off' + s).value));
     }
-    patch({ schedOn: '[' + on.join(',') + ']', schedOff: '[' + off.join(',') + ']' });
+    patch({ schedOn: '[' + on.join(',') + ']', schedOff: '[' + off.join(',') + ']' },
+          'Outdoor lighting times saved');
   };
 
   window.saveClimate = function () {
@@ -672,7 +674,7 @@
     if (Number.isFinite(b))  body.tempSetpoint2 = b;
     if (Number.isFinite(h1)) body.tempHyst1 = h1;
     if (Number.isFinite(h2)) body.tempHyst2 = h2;
-    patch(body);
+    patch(body, 'Climate settings saved');
   };
 
   window.saveSurplus = function () {
@@ -686,27 +688,36 @@
     num('supOnD', 'surplusOnDelayS',  0, 3600);
     num('supOffD','surplusOffDelayS', 0, 3600);
     num('mainsV', 'mainsVolts',      90, 260);
-    patch(body);
+    patch(body, 'Surplus thresholds saved');
   };
 
   // The inverter's own verdict, when wired. Opt-in because an open contact and
   // an unwired terminal read identically - the board cannot tell "no surplus"
   // from "nothing connected", so it has to be told the contact is there.
   window.toggleContact = function () {
-    patch({ solarContactEnabled: !(state && state.solarContactEnabled) });
+    const want = !(state && state.solarContactEnabled);
+    patch({ solarContactEnabled: want },
+          want ? 'Using the inverter contact' : 'Ignoring the inverter contact');
   };
 
   window.saveSolarSource = function () {
-    patch({ solarUrl: $('solarUrl').value.trim(), solarKey: $('solarKey').value.trim() });
+    patch({ solarUrl: $('solarUrl').value.trim(), solarKey: $('solarKey').value.trim() },
+          'Inverter source saved');
   };
 
   window.saveSiren = function () {
     const m = parseInt($('sirenMin').value, 10);
-    if (Number.isFinite(m)) patch({ sirenMinutes: Math.max(0, Math.min(60, m)) });
+    if (Number.isFinite(m)) patch({ sirenMinutes: Math.max(0, Math.min(60, m)) },
+                                  'Siren duration saved');
   };
 
   window.syncClock = function () {
-    patch({ setDateTimeRequest: Math.floor(Date.now() / 1000) });
+    const epoch = Math.floor(Date.now() / 1000);
+    // The device pulls every 3 s and pushes every 5 s, so the clock on screen
+    // can take ~8 s to catch up. Without an immediate acknowledgement that
+    // gap reads as a dead button.
+    patch({ setDateTimeRequest: epoch },
+          'Clock sent - the device will confirm in a few seconds');
   };
 
   // ---- render ----
