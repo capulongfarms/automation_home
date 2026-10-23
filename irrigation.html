@@ -659,7 +659,7 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
             <button class="btn btn-grey" id="provBtn" onclick="previewProvisional()">Preview a provisional week</button>
           </div>
         <div class="sched-form">
-          <label for="schedStart">Start date &amp; time</label>
+          <label for="schedStart">Start date &amp; time <small>(farm time, UTC+8)</small></label>
           <input type="datetime-local" id="schedStart">
           <label>Zones (run one after another, not together)</label>
           <div class="zone-checks">
@@ -910,14 +910,49 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     if (html) el.innerHTML = text; else el.textContent = text;
   }
 
-  // The devices store every epoch as UTC; only this page renders in the
-  // viewer's local timezone. Keep that split - mixing the two is how schedules
-  // end up an hour off after a DST change.
+  // ---------------------------------------------------------------------------
+  // EVERY TIME ON THIS PAGE IS FARM TIME (UTC+8), NOT THE VIEWER'S.
+  //
+  // The devices store every epoch as UTC. This page used to render and parse
+  // them in the BROWSER's timezone, which is correct only when the browser
+  // happens to be at the farm. Set a schedule from a laptop on UTC+3 and
+  // "06:00" became 03:00 UTC - which is 11:00 where the water actually comes
+  // out. Five hours wrong, with nothing on screen to say so.
+  //
+  // A schedule asks when water should reach the plants, so it is answered in
+  // the farm's timezone regardless of where the operator is sitting.
+  // Everything read or typed here is UTC+8, and labelled as such.
+  //
+  // A FIXED offset, deliberately: the Philippines has observed no DST since
+  // 1978, so a fixed +8 cannot drift the way a browser-local reading does.
+  // Asia/Manila is used for display formatting so the month and weekday names
+  // come out right without hand-rolling a calendar.
+  // ---------------------------------------------------------------------------
+  const FARM_TZ_LABEL       = 'farm time';
+  const FARM_TZ_IANA        = 'Asia/Manila';
+  const FARM_UTC_OFFSET_MIN = 8 * 60;
+
+  // Seeds the datetime-local input, which has no timezone of its own and must
+  // therefore be filled with farm wall-clock components. Shifting the epoch
+  // and reading the UTC getters is exact here precisely because the offset is
+  // fixed - do not reuse this trick for a zone that observes DST.
   function epochToLocalInput(epoch) {
-    const d = new Date(epoch * 1000);
+    const d = new Date((epoch + FARM_UTC_OFFSET_MIN * 60) * 1000);
     const pad = n => String(n).padStart(2, '0');
-    return d.getFullYear() + '-' + pad(d.getMonth() + 1) + '-' + pad(d.getDate()) +
-           'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
+    return d.getUTCFullYear() + '-' + pad(d.getUTCMonth() + 1) + '-' + pad(d.getUTCDate()) +
+           'T' + pad(d.getUTCHours()) + ':' + pad(d.getUTCMinutes());
+  }
+
+  // The inverse: a datetime-local value is farm wall-clock, so its components
+  // are read as UTC+8. Returns null rather than NaN on anything unparseable -
+  // Math.floor(new Date('').getTime()/1000) used to yield NaN, which
+  // JSON.stringify writes as null and the firmware then read back as epoch 0.
+  function localInputToEpoch(val) {
+    const m = /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2})/.exec(val || '');
+    if (!m) return null;
+    const utcMs = Date.UTC(+m[1], +m[2] - 1, +m[3], +m[4], +m[5]);
+    if (!Number.isFinite(utcMs)) return null;
+    return Math.floor(utcMs / 1000) - FARM_UTC_OFFSET_MIN * 60;
   }
 
   // ---------------------------------------------------------------------------
@@ -963,8 +998,8 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   function epochToLocalText(epoch) {
     return new Date(epoch * 1000).toLocaleString(undefined, {
       weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
-      hour: '2-digit', minute: '2-digit'
-    });
+      hour: '2-digit', minute: '2-digit', timeZone: FARM_TZ_IANA
+    }) + ' ' + FARM_TZ_LABEL;
   }
 
   function zoneMaskToText(mask) {
@@ -1795,10 +1830,19 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     document.querySelectorAll('.schedZone:checked').forEach(c => mask |= (1 << (parseInt(c.value) - 1)));
     if (!mask) { $('syncNote').textContent = 'Select at least one zone'; return; }
 
-    // No 'Z' suffix: a datetime-local string with no timezone designator is
-    // parsed as LOCAL time, which is what the picker showed the user.
+    // Read as FARM time, not browser time - see localInputToEpoch(). The null
+    // check is not defensive padding: an unparseable value previously became
+    // NaN, which JSON.stringify writes as null and the firmware read back as
+    // epoch 0, producing a phantom entry dated 1 January 1970 that silently
+    // never fired.
+    const startEpoch = localInputToEpoch(startVal);
+    if (startEpoch === null) {
+      $('syncNote').textContent = 'Could not read that start date and time';
+      return;
+    }
+
     schedule.push({
-      start: Math.floor(new Date(startVal).getTime() / 1000),
+      start: startEpoch,
       zones: mask,
       dur: parseInt($('schedDur').value) || 15,
       repeat: parseInt($('schedRepeat').value) || 0,

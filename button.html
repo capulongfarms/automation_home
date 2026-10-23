@@ -348,6 +348,10 @@
           wiring and never changes.</span>
         <span><button class="btn btn-blue" onclick="saveOutNames()">Save names</button></span>
       </div>
+      <p class="muted" style="margin:10px 0 0"><b>All times on this page are farm
+        time (UTC+8).</b> The board converts its UTC clock before applying any
+        window, so a time typed here is the time it happens at the farm,
+        whatever timezone this browser is in.</p>
       <p class="muted" style="margin:10px 0 0">Y01&ndash;Y08 follow their wall switch
          X01&ndash;X08 or these buttons. <b>Y09&ndash;Y11 are on a clock</b> &mdash; ON or
          OFF overrides the schedule until its next change, then the clock takes the
@@ -548,7 +552,7 @@
   // on an old copy long after a fix is deployed - and a stale page is
   // indistinguishable from a broken device unless the page says so itself.
   // BUMP THIS on every change to this file.
-  const PAGE_VERSION = '2026-10-23d';
+  const PAGE_VERSION = '2026-10-23e';
 
   let state = {};
   let unsub = null;
