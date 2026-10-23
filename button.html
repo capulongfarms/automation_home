@@ -503,7 +503,7 @@
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-app.js";
   import { getAuth, signInWithEmailAndPassword, onAuthStateChanged, signOut }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-auth.js";
-  import { getFirestore, doc, setDoc, onSnapshot }
+  import { initializeFirestore, doc, setDoc, onSnapshot }
     from "https://www.gstatic.com/firebasejs/10.12.2/firebase-firestore.js";
 
   const firebaseConfig = {
@@ -517,7 +517,28 @@
 
   const app  = initializeApp(firebaseConfig);
   const auth = getAuth(app);
-  const db   = getFirestore(app);
+
+  // ---------------------------------------------------------------------------
+  // experimentalAutoDetectLongPolling, and why it is not optional here.
+  //
+  // onSnapshot() holds a long-lived WebChannel stream open. A one-off setDoc()
+  // is an ordinary HTTPS request. Those two take different paths through the
+  // network, and plenty of things break only the first: Chrome extensions that
+  // block trackers, privacy tools, antivirus web shields, captive portals and
+  // corporate proxies.
+  //
+  // When that happens the page fails in a genuinely confusing way - buttons
+  // work, because writes get through, but nothing ever comes back, so the
+  // device looks dead while the serial console shows it publishing happily.
+  // That is exactly the state this page was found in: the Sync button reached
+  // the board and set its clock, yet no temperature or clock state ever
+  // appeared on the page.
+  //
+  // Auto-detect probes the stream and silently falls back to long polling when
+  // it cannot be established. The cost is a slightly chattier connection; the
+  // benefit is that the page works on networks where it otherwise cannot.
+  // ---------------------------------------------------------------------------
+  const db   = initializeFirestore(app, { experimentalAutoDetectLongPolling: true });
   const ref  = doc(db, "devices", "button_led");
 
   const $ = id => document.getElementById(id);
@@ -527,10 +548,12 @@
   // on an old copy long after a fix is deployed - and a stale page is
   // indistinguishable from a broken device unless the page says so itself.
   // BUMP THIS on every change to this file.
-  const PAGE_VERSION = '2026-10-23a';
+  const PAGE_VERSION = '2026-10-23b';
 
   let state = {};
   let unsub = null;
+  let snapSeen = false;        // has the listener ever delivered a snapshot?
+  let snapWatchdog = null;
 
   const MODE_MANUAL = 0;
 
@@ -906,7 +929,26 @@
       $('logoutBtn').style.display = '';
       $('userEmail').textContent = user.email;
       if (unsub) { unsub(); unsub = null; }
+
+      // A listener that never delivers anything used to be indistinguishable
+      // from a device that never reported. Ten seconds is far longer than a
+      // working subscription needs and short enough to notice.
+      snapSeen = false;
+      clearTimeout(snapWatchdog);
+      snapWatchdog = setTimeout(() => {
+        if (snapSeen) return;
+        $('syncNote').innerHTML = 'No data from Firestore after 10s - the live ' +
+          'stream is not getting through. Try an incognito window, or disable ' +
+          'extensions for this page. <small>(page ' + PAGE_VERSION + ')</small>';
+        $('syncNote').style.color = '#B6593F';
+      }, 10000);
+
       unsub = onSnapshot(ref, (snap) => {
+        if (!snapSeen) {
+          snapSeen = true;
+          clearTimeout(snapWatchdog);
+          $('syncNote').style.color = '';   // clear a watchdog or error colour
+        }
         if (snap.exists()) render(snap.data());
         else $('syncNote').textContent =
           'Waiting for the device to report in... \u00b7 page ' + PAGE_VERSION;
