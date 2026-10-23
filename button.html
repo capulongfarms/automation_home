@@ -521,6 +521,14 @@
   const ref  = doc(db, "devices", "button_led");
 
   const $ = id => document.getElementById(id);
+
+  // Shown in the live indicator so the page can be asked which version it is.
+  // GitHub Pages serves this file with a cache lifetime, so a browser can sit
+  // on an old copy long after a fix is deployed - and a stale page is
+  // indistinguishable from a broken device unless the page says so itself.
+  // BUMP THIS on every change to this file.
+  const PAGE_VERSION = '2026-10-23a';
+
   let state = {};
   let unsub = null;
 
@@ -886,7 +894,9 @@
     $('clockBtn').className = 'btn ' + (live ? 'btn-blue' : 'btn-warn');
 
     // Leave a save confirmation visible for its couple of seconds.
-    if (!$('syncNote').style.color) $('syncNote').textContent = 'Live';
+    if (!$('syncNote').style.color)
+      $('syncNote').textContent = 'Live ' + new Date().toLocaleTimeString() +
+                                  ' \u00b7 page ' + PAGE_VERSION;
   }
 
   onAuthStateChanged(auth, (user) => {
@@ -898,8 +908,15 @@
       if (unsub) { unsub(); unsub = null; }
       unsub = onSnapshot(ref, (snap) => {
         if (snap.exists()) render(snap.data());
-        else $('syncNote').textContent = 'Waiting for the device to report in...';
-      }, (err) => { $('syncNote').textContent = 'Listener error: ' + err.message; });
+        else $('syncNote').textContent =
+          'Waiting for the device to report in... \u00b7 page ' + PAGE_VERSION;
+      }, (err) => {
+        // A denied or dropped read is reported here rather than only in the
+        // console, because nobody looks in the console.
+        $('syncNote').textContent = 'Listener error: ' + err.message +
+                                    ' \u00b7 page ' + PAGE_VERSION;
+        $('syncNote').style.color = '#B6593F';
+      });
     } else {
       if (unsub) { unsub(); unsub = null; }
       $('controlScreen').style.display = 'none';
