@@ -770,6 +770,22 @@
   }
   setInterval(renderSinceTurn, 1000);
 
+  // Same device-epoch reconstruction as renderSinceTurn, for the clock readout
+  // itself. Rendered straight from the snapshot it sat frozen between pushes,
+  // which read as a stopped clock on a board that was running perfectly.
+  let clockIsLiveSeen = false, clockNoteHasData = false;
+
+  function renderClockNote() {
+    if (!clockNoteHasData) return;
+    const el = $('clockNote');
+    if (!el || !deviceEpoch) return;
+    const now = deviceEpoch + Math.floor((Date.now() - deviceEpochSeenAt) / 1000);
+    el.textContent = 'Current: ' +
+      new Date(now * 1000).toISOString().slice(0, 16).replace('T', ' ') + ' UTC' +
+      (clockIsLiveSeen ? '' : ' (never set - using fallback)');
+  }
+  setInterval(renderClockNote, 1000);
+
 
   // ---------- HMI mimic ----------
   // Pure consumer of the same snapshot the tables use. Deliberately tolerant of
@@ -1094,12 +1110,15 @@
     $('eggTypeSelect').value = data.eggType ?? 'Chicken';
 
     if (typeof data.currentEpoch === 'number') {
-      const nowDt = new Date(data.currentEpoch * 1000);
-      const nowDtStr = nowDt.toISOString().slice(0, 16);
+      // The INPUT is only refreshed on a push - it is something the operator
+      // types into, and a field that retimes itself every second cannot be
+      // used. The note beside it ticks instead; see renderClockNote().
       const dtInput = $('dateTimeInput');
-      if (document.activeElement !== dtInput) dtInput.value = nowDtStr;
-      $('clockNote').textContent = 'Current: ' + nowDtStr.replace('T', ' ') + ' UTC' +
-        (data.clockIsLive ? '' : ' (never set - using fallback)');
+      if (document.activeElement !== dtInput)
+        dtInput.value = new Date(data.currentEpoch * 1000).toISOString().slice(0, 16);
+      clockIsLiveSeen  = !!data.clockIsLive;
+      clockNoteHasData = true;
+      renderClockNote();
     }
     $('selectIncubatorBtn').className = 'mode-select-btn' + (isHatcher ? '' : ' active');
     $('selectHatcherBtn').className = 'mode-select-btn' + (isHatcher ? ' active' : '');

@@ -548,7 +548,7 @@
   // on an old copy long after a fix is deployed - and a stale page is
   // indistinguishable from a broken device unless the page says so itself.
   // BUMP THIS on every change to this file.
-  const PAGE_VERSION = '2026-10-23c';
+  const PAGE_VERSION = '2026-10-23d';
 
   let state = {};
   let unsub = null;
@@ -769,6 +769,47 @@
   };
 
   // ---- render ----
+  // ---------------------------------------------------------------------------
+  // THE DEVICE CLOCK TICKS LOCALLY BETWEEN PUSHES.
+  //
+  // currentEpoch only changes when a push arrives, so rendering it straight
+  // from the snapshot left the displayed clock frozen until the page was
+  // reloaded - it looked stopped even though the board was fine.
+  //
+  // Holding the last published epoch together with the local time it arrived,
+  // and advancing from that, keeps the display moving whatever the push
+  // interval does. It also still shows the DEVICE's time rather than the
+  // browser's wall clock, so a laptop with a wrong clock cannot quietly
+  // rewrite what the board reports.
+  //
+  // Ticked every second. The cost is one Date.now() and a string format, and a
+  // minute-resolution display updating on the second it changes reads better
+  // than one that lurches a minute late.
+  // ---------------------------------------------------------------------------
+  let clockEpoch = null, clockSeenAt = 0, clockLive = false, clockHasData = false;
+
+  function renderDeviceClock() {
+    // Leave the em dash alone until the device has actually reported.
+    if (!clockHasData) return;
+    const el = $('clockState');
+    if (!el) return;
+
+    if (!clockLive) {
+      el.textContent = 'NEVER SET - outdoor schedule will not run';
+      el.style.color = '#B6593F';
+    } else if (clockEpoch === null) {
+      el.textContent = 'set';
+      el.style.color = '';
+    } else {
+      const now = clockEpoch + Math.floor((Date.now() - clockSeenAt) / 1000);
+      el.textContent = new Date(now * 1000).toLocaleString();
+      el.style.color = '';
+    }
+    const btn = $('clockBtn');
+    if (btn) btn.className = 'btn ' + (clockLive ? 'btn-blue' : 'btn-warn');
+  }
+  setInterval(renderDeviceClock, 1000);
+
   function render(d) {
     state = d;
     const rawOuts  = parse(d.outputs, []);
@@ -926,12 +967,12 @@
     badge($('outBusBadge'), d.outBusOk === false ? 'LOST' : 'OK', d.outBusOk === false ? 'alm' : 'on');
     $('netVal').textContent = d.network || '-';
 
-    const live = !!d.clockIsLive;
-    $('clockState').textContent = live
-      ? (d.currentEpoch ? new Date(Number(d.currentEpoch) * 1000).toLocaleString() : 'set')
-      : 'NEVER SET - outdoor schedule will not run';
-    $('clockState').style.color = live ? '' : '#B6593F';
-    $('clockBtn').className = 'btn ' + (live ? 'btn-blue' : 'btn-warn');
+    clockLive    = !!d.clockIsLive;
+    clockEpoch   = (d.currentEpoch === undefined || d.currentEpoch === null)
+                     ? null : Number(d.currentEpoch);
+    clockSeenAt  = Date.now();
+    clockHasData = true;
+    renderDeviceClock();
 
     // Leave a save confirmation visible for its couple of seconds.
     if (!$('syncNote').style.color) {

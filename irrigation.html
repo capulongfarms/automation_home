@@ -920,6 +920,46 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
            'T' + pad(d.getHours()) + ':' + pad(d.getMinutes());
   }
 
+  // ---------------------------------------------------------------------------
+  // THE DEVICE CLOCK TICKS LOCALLY BETWEEN PUSHES.
+  //
+  // currentEpoch only changes when a push arrives, so rendering it straight
+  // from the snapshot left the displayed clock frozen until the page was
+  // reloaded - it looked stopped even though the board was fine.
+  //
+  // Holding the last published epoch together with the local time it arrived,
+  // and advancing from that, keeps the display moving whatever the push
+  // interval does. It also still shows the DEVICE's time rather than the
+  // browser's wall clock, so a laptop with a wrong clock cannot quietly
+  // rewrite what the board reports.
+  //
+  // Ticked every second. The cost is one Date.now() and a string format, and a
+  // minute-resolution display updating on the second it changes reads better
+  // than one that lurches a minute late.
+  // ---------------------------------------------------------------------------
+  let clockEpoch = null, clockSeenAt = 0, clockLive = false, clockHasData = false;
+
+  function renderDeviceClock() {
+    if (!clockHasData) return;
+    const el = $('clockState');
+    if (!el) return;
+
+    if (!clockLive) {
+      el.textContent = 'NEVER SET - calendar will not run';
+      el.style.color = '#b91c1c';
+    } else if (clockEpoch === null) {
+      el.textContent = 'set';
+      el.style.color = '';
+    } else {
+      const now = clockEpoch + Math.floor((Date.now() - clockSeenAt) / 1000);
+      el.textContent = epochToLocalText(now);
+      el.style.color = '';
+    }
+    const btn = $('clockBtn');
+    if (btn) btn.className = 'btn ' + (clockLive ? 'btn-grey' : 'btn-warn');
+  }
+  setInterval(renderDeviceClock, 1000);
+
   function epochToLocalText(epoch) {
     return new Date(epoch * 1000).toLocaleString(undefined, {
       weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
@@ -1448,12 +1488,12 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
 
     // A clock that has never been set is not a detail - it silently stops the
     // whole calendar, so it is called out rather than left to be noticed.
-    const live = !!data.clockIsLive;
-    $('clockState').textContent = live
-      ? (data.currentEpoch ? epochToLocalText(data.currentEpoch) : 'set')
-      : 'NEVER SET - calendar will not run';
-    $('clockState').style.color = live ? '' : '#b91c1c';
-    $('clockBtn').className = 'btn ' + (live ? 'btn-grey' : 'btn-warn');
+    clockLive    = !!data.clockIsLive;
+    clockEpoch   = (data.currentEpoch === undefined || data.currentEpoch === null)
+                     ? null : Number(data.currentEpoch);
+    clockSeenAt  = Date.now();
+    clockHasData = true;
+    renderDeviceClock();
 
     setBadge('pumpABadge', !!data.pumpARunning, data.pumpARunning ? 'RUNNING' : 'OFF');
     setBadge('pumpBBadge', !!data.pumpBRunning, data.pumpBRunning ? 'RUNNING' : 'OFF');
