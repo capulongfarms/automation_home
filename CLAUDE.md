@@ -56,6 +56,66 @@ Its local source is `13.Headend/index.html` in the workspace. `14.Nodes/` delibe
 
 **This is a settled decision, confirmed 2026-08-15 — do not propose changing it.** An earlier version of this file recommended one dedicated Auth account per device and called reuse a "known divergence." That guidance has been retired. The owner was shown the trade-off explicitly — any one device's credentials can read and write every other device's document, which matters more now that the irrigation Node lives outside a locked building — and chose to keep the shared account, because document-level separation gives the state isolation actually wanted. Revisit only if the owner raises it, or if a device is lost or stolen.
 
+## Page conventions added 2026-10-23
+
+### `PAGE_VERSION` — bump it on every edit
+
+GitHub Pages serves these files with a cache lifetime, so a browser can sit on
+an old copy long after a fix is deployed — and **a stale page is
+indistinguishable from a broken device**. Each page carries
+`const PAGE_VERSION = 'YYYY-MM-DDx'` and prints it in the live indicator.
+**Bump it whenever you change that file**, or the stamp lies and is worse than
+nothing.
+
+### The live indicator has four distinct states
+
+| Indicator | Meaning |
+|---|---|
+| `Live 15:42:03 · from server · page …` | Healthy |
+| `Offline — showing this browser's own writes` | `snap.metadata.fromCache` — the Listen stream is not getting through |
+| `Waiting for the device to report in...` | The document does not exist |
+| `Listener error: …` | Firestore refused the read, usually security rules |
+
+**`fromCache` is the one that earns its keep.** Firestore runs **separate
+Listen and Write streams**, and the SDK applies local writes immediately for
+latency compensation. So with Listen blocked but Write working, `onSnapshot`
+fires at once with a document assembled from nothing but the page's **own**
+writes: `exists()` is true, `render()` runs, the indicator says "Live", and not
+one field the device published is present.
+
+That is indistinguishable from a board that has never reported. It cost most of
+a session on 2026-10-23 while the device was provably publishing correct values
+a second earlier. A ten-second watchdog also now reports a listener that never
+delivers anything at all.
+
+### The device clock ticks locally, on every page that shows one
+
+`currentEpoch` only changes when a push arrives, so rendering it straight from
+the snapshot left the clock frozen until the page was reloaded. Each page keeps
+the last published epoch **plus the local time it arrived** and advances from
+that, re-rendering every second — and still shows the **device's** time, never
+the browser's wall clock, so a laptop with a wrong clock cannot quietly rewrite
+what the board reports.
+
+`incubator.html`'s `dateTimeInput` is deliberately **not** ticked: it is a
+field the operator types into, and one that retimes itself every second cannot
+be used.
+
+### Times on `irrigation.html` and `button.html` are farm time (UTC+8)
+
+A `datetime-local` input carries no timezone and was parsed with `new Date()`,
+i.e. the **browser's** zone — so a schedule set from a machine on UTC+3 fired
+**five hours late** at the farm. Both pages now read and render through
+`Asia/Manila` and label the unit.
+
+`localInputToEpoch()` returns **`null`, never `NaN`**: the old
+`new Date(val).getTime()` produced `NaN`, `JSON.stringify` wrote `"start":null`,
+and the firmware read it back as **epoch 0** — the origin of the phantom
+schedule entries dated 1 January 1970.
+
+**`incubator.html` and `soil.html` still show UTC.** The fleet is inconsistent
+until they are converted.
+
 ## Key Gotchas
 
 - **The `firebaseConfig` values in the pages are not secret.** `apiKey`, `projectId`, etc. are meant to be public; real access control is enforced server-side by Firestore Security Rules, not by hiding this config.
