@@ -548,12 +548,29 @@
   // on an old copy long after a fix is deployed - and a stale page is
   // indistinguishable from a broken device unless the page says so itself.
   // BUMP THIS on every change to this file.
-  const PAGE_VERSION = '2026-10-23b';
+  const PAGE_VERSION = '2026-10-23c';
 
   let state = {};
   let unsub = null;
   let snapSeen = false;        // has the listener ever delivered a snapshot?
   let snapWatchdog = null;
+  // ---------------------------------------------------------------------------
+  // fromCache is the flag that tells you whether you are looking at the server
+  // or at your own echo, and its absence cost a long diagnosis.
+  //
+  // Firestore runs SEPARATE Listen and Write streams. A filter, proxy or
+  // extension can break Listen while leaving Write working - and because the
+  // SDK applies local writes immediately (latency compensation), onSnapshot
+  // fires at once with a document assembled from nothing but the page's OWN
+  // writes. snap.exists() is true, render() runs, the indicator says "Live",
+  // and not one field the device published is present. It looks precisely like
+  // a board that has never reported, which is how this page was read for most
+  // of a debugging session while the device was publishing correctly all along.
+  //
+  // snap.metadata.fromCache === true means "this did not come from the server".
+  // It is now on screen, because the distinction is invisible otherwise.
+  // ---------------------------------------------------------------------------
+  let lastFromCache = null;
 
   const MODE_MANUAL = 0;
 
@@ -917,9 +934,19 @@
     $('clockBtn').className = 'btn ' + (live ? 'btn-blue' : 'btn-warn');
 
     // Leave a save confirmation visible for its couple of seconds.
-    if (!$('syncNote').style.color)
-      $('syncNote').textContent = 'Live ' + new Date().toLocaleTimeString() +
-                                  ' \u00b7 page ' + PAGE_VERSION;
+    if (!$('syncNote').style.color) {
+      if (lastFromCache) {
+        // Not a cosmetic warning: every value on the page is the page's own
+        // echo, and the device's real state is unknown.
+        $('syncNote').innerHTML = '<b>Offline - showing this browser\u2019s own ' +
+          'writes, not the device.</b> Firestore\u2019s listen stream is not ' +
+          'getting through. <small>(page ' + PAGE_VERSION + ')</small>';
+        $('syncNote').style.color = '#B6593F';
+      } else {
+        $('syncNote').textContent = 'Live ' + new Date().toLocaleTimeString() +
+                                    ' \u00b7 from server \u00b7 page ' + PAGE_VERSION;
+      }
+    }
   }
 
   onAuthStateChanged(auth, (user) => {
@@ -947,8 +974,12 @@
         if (!snapSeen) {
           snapSeen = true;
           clearTimeout(snapWatchdog);
-          $('syncNote').style.color = '';   // clear a watchdog or error colour
         }
+        // Cleared on every snapshot, not just the first: the offline warning
+        // below latches the colour, and a recovered connection has to be able
+        // to clear it again.
+        if (!noteTimer) $('syncNote').style.color = '';
+        lastFromCache = snap.metadata.fromCache;
         if (snap.exists()) render(snap.data());
         else $('syncNote').textContent =
           'Waiting for the device to report in... \u00b7 page ' + PAGE_VERSION;
