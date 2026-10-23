@@ -246,6 +246,15 @@
   input[type=time] { width:6.6em; }
   table.ctl td, table.ctl th { min-width:0; }
   .muted { color:#8a9184; font-size:.74rem; }
+  /* A name field has to look editable without turning the table into a form.
+     Borderless until hovered or focused: the label reads as a label, and
+     invites a click once you know it is one. */
+  input.nm { width:100%; min-width:5em; box-sizing:border-box; padding:4px 5px;
+             border:1px solid transparent; border-radius:5px; background:transparent;
+             font:inherit; font-size:.85rem; font-weight:600; color:#2a3a24; }
+  input.nm:hover { border-color:#d8ddd2; }
+  input.nm:focus { border-color:#4A7C3F; background:#fff; outline:none; }
+  td.pin { font-family:ui-monospace,Consolas,monospace; font-size:.76rem; color:#8a9184; }
   .alarm-banner { background:#fdecea; color:#B6593F; border-left:4px solid #B6593F;
                   border-radius:8px; padding:11px 14px; font-weight:700;
                   margin-bottom:12px; font-size:.9rem; }
@@ -312,6 +321,11 @@
         <tr><th>Zone</th><th>Input</th><th>Contact</th><th>Status</th></tr>
         <tbody id="zoneRows"></tbody>
       </table></div>
+      <div class="row">
+        <span class="muted">Zone names are yours to set &mdash; the <code>X</code> number is
+          the wiring and never changes.</span>
+        <span><button class="btn btn-blue" onclick="saveZoneNames()">Save names</button></span>
+      </div>
       <p class="muted" style="margin:8px 0 0">Zones are normally-open contacts &mdash;
          a <b>closed</b> contact is a trip. The Status button arms or disarms that zone
          on its own; <b>ARM</b> and <b>DISARM</b> above apply to all eight at once.
@@ -329,6 +343,11 @@
         <tr><th></th><th>Status</th><th>Switch</th><th>ON</th><th>OFF</th></tr>
         <tbody id="lightRows"></tbody>
       </table></div>
+      <div class="row">
+        <span class="muted">Rename any channel &mdash; the <code>Y</code> number is the
+          wiring and never changes.</span>
+        <span><button class="btn btn-blue" onclick="saveOutNames()">Save names</button></span>
+      </div>
       <p class="muted" style="margin:10px 0 0">Y01&ndash;Y08 follow their wall switch
          X01&ndash;X08 or these buttons. <b>Y09&ndash;Y11 are on a clock</b> &mdash; ON or
          OFF overrides the schedule until its next change, then the clock takes the
@@ -522,7 +541,25 @@
   }
   // Writes are merged, never whole-document: the device owns most of these
   // fields and a full overwrite would erase whatever it published last.
-  const patch = (o) => setDoc(ref, o, { merge: true });
+  //
+  // The optional note is shown briefly in place of the live indicator. A Save
+  // button that gives no acknowledgement leaves you pressing it again to find
+  // out whether the first press worked.
+  let noteTimer = null;
+  function patch(o, note) {
+    const p = setDoc(ref, o, { merge: true });
+    if (note) {
+      $('syncNote').textContent = note;
+      $('syncNote').style.color = '#4A7C3F';
+      clearTimeout(noteTimer);
+      noteTimer = setTimeout(() => { $('syncNote').style.color = ''; }, 2500);
+    }
+    p.catch((e) => {
+      $('syncNote').textContent = 'Write failed: ' + e.message;
+      $('syncNote').style.color = '#B6593F';
+    });
+    return p;
+  }
 
   window.signIn = async function () {
     $('loginError').textContent = '';
@@ -568,6 +605,34 @@
     const ov = parse(state.schedOverride, [0, 0, 0]);
     ov[i] = want ? 1 : -1;
     patch({ setSchedOverride: '[' + ov.join(',') + ']' });
+  };
+
+  // Attribute-safe: these go straight into a value="..." in generated markup.
+  function esc(t) {
+    return String(t == null ? '' : t)
+      .replace(/&/g, '&amp;').replace(/"/g, '&quot;').replace(/</g, '&lt;');
+  }
+
+  // The whole set in one write, same as setOutputs and setZoneArmed. Sending
+  // one name would mean the page inventing the rest, and these are the labels
+  // someone reads when the alarm goes off - they must match what was typed.
+  window.saveZoneNames = function () {
+    const out = [];
+    for (let i = 0; i < 8; i++) out.push(($('zn' + i).value || '').replace(/\|/g, ' ').trim());
+    patch({ setZoneNames: out.join('|') }, 'Zone names saved');
+  };
+
+  window.saveOutNames = function () {
+    const outs = parse(state.outputs, []);
+    const out = [];
+    for (let i = 0; i < 16; i++) {
+      const f = $('yn' + i);
+      // Y12-Y16 have no field on this page - keep whatever the device holds
+      // rather than blanking a name the UI never offered to edit.
+      out.push(f ? (f.value || '').replace(/\|/g, ' ').trim()
+                 : (outs[i] ? outs[i].n : ''));
+    }
+    patch({ setOutNames: out.join('|') }, 'Channel names saved');
   };
 
   window.saveValveSlots = function () {
@@ -677,11 +742,19 @@
       bn.style.display = '';
     } else { bn.style.display = 'none'; }
 
+    // Never rebuild a table while one of its name fields has focus, or the
+    // 3 s poll deletes what is being typed mid-word.
+    const editing = (p) => {
+      const a = document.activeElement;
+      return a && a.classList && a.classList.contains('nm') && (a.id || '').startsWith(p);
+    };
+
     // RED means armed, GREEN means disarmed - the owner's convention, and the
     // opposite of the usual "green is good". Armed is the state that bites.
-    $('zoneRows').innerHTML = zones.map((z, i) => {
+    if (!editing('zn')) $('zoneRows').innerHTML = zones.map((z, i) => {
       const za = z.armed !== false;
-      return '<tr><td>' + z.n + '</td><td class="muted">X' + (9 + i) + '</td>' +
+      return '<tr><td><input class="nm" id="zn' + i + '" value="' + esc(z.n) +
+        '" maxlength="23"' + dis + '></td><td class="pin">X' + (9 + i) + '</td>' +
         '<td><span class="badge ' + (z.open ? 'alm' : 'off') + '">' +
         (z.open ? 'OPEN' : 'closed') + '</span></td>' +
         '<td><button class="btn ' + (za ? 'btn-warn' : 'btn-on') + '"' + dis +
@@ -694,19 +767,21 @@
     // input, because no wall switch drives them.
     const ov = parse(d.schedOverride, [0, 0, 0]);
     let rows = outs.slice(0, 8).map((o, i) =>
-      '<tr><td>' + o.n + '</td>' +
+      '<tr><td><input class="nm" id="yn' + i + '" value="' + esc(o.n) +
+      '" maxlength="23"' + dis + '></td>' +
       '<td><span class="badge ' + (o.on ? 'on' : 'off') + '">' + (o.on ? 'ON' : 'off') + '</span></td>' +
       '<td class="muted">X' + String(i + 1).padStart(2, '0') + (sw[i] ? ' &bull;' : '') + '</td>' +
       '<td><button class="btn btn-on"' + dis + ' onclick="setOut(' + i + ',true)">ON</button></td>' +
       '<td><button class="btn btn-off"' + dis + ' onclick="setOut(' + i + ',false)">OFF</button></td></tr>').join('');
 
     rows += outs.slice(8, 11).map((o, i) =>
-      '<tr><td>' + o.n + '</td>' +
+      '<tr><td><input class="nm" id="yn' + (i + 8) + '" value="' + esc(o.n) +
+      '" maxlength="23"' + dis + '></td>' +
       '<td><span class="badge ' + (o.on ? 'on' : 'off') + '">' + (o.on ? 'ON' : 'off') + '</span></td>' +
       '<td class="muted">' + (ov[i] ? 'override' : 'clock') + '</td>' +
       '<td><button class="btn btn-on"' + dis + ' onclick="setSched(' + i + ',true)">ON</button></td>' +
       '<td><button class="btn btn-off"' + dis + ' onclick="setSched(' + i + ',false)">OFF</button></td></tr>').join('');
-    $('lightRows').innerHTML = rows;
+    if (!editing('yn')) $('lightRows').innerHTML = rows;
 
     const nOv = ov.filter(v => v !== 0).length;
     $('ovNote').textContent = nOv
@@ -799,7 +874,8 @@
     $('clockState').style.color = live ? '' : '#B6593F';
     $('clockBtn').className = 'btn ' + (live ? 'btn-blue' : 'btn-warn');
 
-    $('syncNote').textContent = 'Live';
+    // Leave a save confirmation visible for its couple of seconds.
+    if (!$('syncNote').style.color) $('syncNote').textContent = 'Live';
   }
 
   onAuthStateChanged(auth, (user) => {
