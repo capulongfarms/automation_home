@@ -800,6 +800,13 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
         <div class="row">
           <span>Max zones open at once <small id="nodeCapLive" style="opacity:.75">&mdash;</small></span>
           <span><select id="vMaxConInput" style="width:4.5em">
+                  <!-- Placeholder FIRST, so an unloaded select shows a dash
+                       rather than silently claiming the lowest value. With 2
+                       first, every refresh displayed "2" before the node's
+                       document arrived, and the operator reasonably read that
+                       as the live setting and changed it again. A control must
+                       not state a value it has not been told. -->
+                  <option value="" disabled selected>&mdash;</option>
                   <option value="2">2</option>
                   <option value="3">3</option>
                   <option value="4">4</option>
@@ -889,7 +896,7 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   // is. Pages serves this file with a cache lifetime, so a browser can sit on
   // an old copy long after a fix is deployed, and a stale page is
   // indistinguishable from a broken device. BUMP THIS on every change here.
-  const PAGE_VERSION = '2026-10-23c';
+  const PAGE_VERSION = '2026-10-24a';
 
   let schedule = [];
   // An edit takes a pull PLUS a push to come back - up to about eight seconds.
@@ -1605,8 +1612,12 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     // Request is shown separately from Status on purpose: a pump can be
     // requested and still not running, and that gap IS the interlock doing its
     // job. Collapsing the two would hide the single most useful thing on the page.
-    setReqBadge('pumpAReq', !!data.manualPumpARequest);
-    setReqBadge('pumpBReq', !!data.manualPumpBRequest);
+    // manualPumpAActive, not manualPumpARequest. The request field is a
+    // command the board consumes and clears; reading it as status made a
+    // cleared request look active until the next pull, and a consumed one look
+    // cancelled. Status is published by the board under its own name.
+    setReqBadge('pumpAReq', !!data.manualPumpAActive);
+    setReqBadge('pumpBReq', !!data.manualPumpBActive);
 
     setBadge('fertBadge', !!data.fertigationOn);
     setBadge('filtBadge', !!data.filtrationOn);
@@ -1811,8 +1822,11 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
     // as nothing being set rather than as something out of range. So echo the
     // number the Node actually reports, and only move the dropdown when it is
     // a value the dropdown can hold.
-    if (typeof s.valveMaxConcurrent === 'number') {
-      const cap = s.valveMaxConcurrent;
+    // valveMaxActive, not valveMaxConcurrent. The latter is the field THIS
+    // page writes; the node no longer publishes it, because publishing a field
+    // it also pulls meant it clobbered every change made here.
+    if (typeof s.valveMaxActive === 'number') {
+      const cap = s.valveMaxActive;
       const inRange = cap >= 2 && cap <= 6;
       $('nodeCapLive').textContent = inRange
         ? '(node reports ' + cap + ')'
@@ -1964,10 +1978,16 @@ table.sched tr.pumprow td:first-child { font-weight: 700; }
   window.setPump = function (which, on) {
     const key   = which === 'B' ? 'manualPumpBRequest' : 'manualPumpARequest';
     const other = which === 'B' ? 'manualPumpARequest' : 'manualPumpBRequest';
-    // Clearing the other in the SAME patch, not a second write: two writes
-    // leave a window where both read true, and the device acts on what it sees.
-    patch(headDocRef, on ? { [key]: true, [other]: false } : { [key]: false },
-          'Pump ' + which + (on ? ' requested' : ' request cancelled'));
+    // ON writes a REQUEST the board consumes and acknowledges by clearing it.
+    // OFF cannot be "write false", because false is the resting state of an
+    // acknowledged request and carries no instruction - so cancelling is its
+    // own request field. Before this, OFF wrote false and the board's own
+    // 5-second push overwrote it with its stale true on every pass, which made
+    // the request impossible to clear from the page at all.
+    if (on) patch(headDocRef, { [key]: true, [other]: false },
+                  'Pump ' + which + ' requested');
+    else    patch(headDocRef, { manualPumpCancelRequest: true },
+                  'Pump request cancelled');
   };
 
   window.setService = function (which, inService) {
