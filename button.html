@@ -552,7 +552,7 @@
   // on an old copy long after a fix is deployed - and a stale page is
   // indistinguishable from a broken device unless the page says so itself.
   // BUMP THIS on every change to this file.
-  const PAGE_VERSION = '2026-10-23e';
+  const PAGE_VERSION = '2026-10-24a';
 
   let state = {};
   let unsub = null;
@@ -792,6 +792,13 @@
   // ---------------------------------------------------------------------------
   let clockEpoch = null, clockSeenAt = 0, clockLive = false, clockHasData = false;
 
+  // This board's schedules are minutes-of-day, converted to farm time inside
+  // the FIRMWARE (see farmLocalParts() in 1.Button_LED.ino), so the page only
+  // needs these for DISPLAY. Kept identical to 13.Headend's so the two pages
+  // never disagree about what time it is at the farm.
+  const FARM_TZ_IANA  = 'Asia/Manila';
+  const FARM_TZ_LABEL = 'farm time';
+
   function renderDeviceClock() {
     // Leave the em dash alone until the device has actually reported.
     if (!clockHasData) return;
@@ -805,8 +812,24 @@
       el.textContent = 'set';
       el.style.color = '';
     } else {
+      // FARM TIME, NOT THE BROWSER'S. This read toLocaleString() with no
+      // timeZone, so it rendered the device's epoch in whatever zone the
+      // browser sits in - five hours out when the operator is on UTC+3 and the
+      // farm is UTC+8. The firmware was right the whole time; the page was
+      // lying, and it looked exactly like a clock that had not synced.
+      //
+      // The epoch on the wire stays UTC, as it does everywhere in this fleet.
+      // Only the presentation is shifted, and it is LABELLED so there is no
+      // doubt about which zone is being shown. Same rule as 13.Headend.
+      //
+      // 24-hour, by request: hour12 false. An irrigation or lighting window at
+      // "7:00" is ambiguous in a way that "19:00" is not.
       const now = clockEpoch + Math.floor((Date.now() - clockSeenAt) / 1000);
-      el.textContent = new Date(now * 1000).toLocaleString();
+      el.textContent = new Date(now * 1000).toLocaleString(undefined, {
+        weekday: 'short', year: 'numeric', month: 'short', day: 'numeric',
+        hour: '2-digit', minute: '2-digit', second: '2-digit',
+        hour12: false, timeZone: FARM_TZ_IANA
+      }) + ' ' + FARM_TZ_LABEL;
       el.style.color = '';
     }
     const btn = $('clockBtn');
@@ -988,7 +1011,7 @@
           'getting through. <small>(page ' + PAGE_VERSION + ')</small>';
         $('syncNote').style.color = '#B6593F';
       } else {
-        $('syncNote').textContent = 'Live ' + new Date().toLocaleTimeString() +
+        $('syncNote').textContent = 'Live ' + new Date().toLocaleTimeString(undefined, { hour12: false }) +
                                     ' \u00b7 from server \u00b7 page ' + PAGE_VERSION;
       }
     }
