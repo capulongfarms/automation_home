@@ -19,7 +19,7 @@ Live site: https://capulongfarms.github.io/automation_home/
 - **Firebase Authentication** (email/password) gates access on each device page — only signed-in users can read or write device state. The dashboard itself has no auth gate since it shows no device data.
 - **Cloud Firestore** (project `automation-home-4b86f`) holds live device state, one document per device under the `devices` collection (e.g. `devices/button_led`).
 - Real-time sync on the web side via Firestore's `onSnapshot` listener — no polling.
-- ESP32 firmware source is **not** in this repo — it lives in the Capulong Farms workspace (a separate, private repo), under `Project Details/4.Automation/0Master/Codes/`:
+- ESP32 firmware source is **not** in this repo — it lives in the Capulong Farms workspace (a separate, private repo), under `Project Details/4.Automation/0Master/`:
   - `1.Button_LED/1.Button_LED.ino`
   - `12.Incubator/12.Incubator.ino`
   - `13.Headend/13.Headend.ino`
