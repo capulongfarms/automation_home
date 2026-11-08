@@ -24,7 +24,7 @@ Live site: https://capulongfarms.github.io/automation_home/
   - `12.Incubator/12.Incubator.ino`
   - `13.Headend/13.Headend.ino`
   - `14.Nodes/14.Nodes.ino`
-  - That folder also has a `Home/` subfolder — no firmware, just the dashboard's local source, `architecture-diagram.html`, a multi-root `.code-workspace`, and a `README.md` describing this whole deployment strategy (including how to add a new project's page).
+  - That folder also has a `Home/` subfolder — no firmware, just the dashboard's local source, the reference documents (in `Home/Files/`, including `architecture-diagram.html`), a multi-root `.code-workspace`, and a `README.md` describing this whole deployment strategy (including how to add a new project's page).
 
 ## Devices
 
