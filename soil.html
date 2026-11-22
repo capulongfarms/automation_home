@@ -486,14 +486,15 @@
         <div class="row"><span>Uploads deduplicated</span><span id="dDup">&mdash;</span></div>
       </div>
 
-      <div class="group group-warn">
-        <h3>Waiting on the field unit</h3>
+      <div class="group">
+        <h3>The field unit</h3>
         <div class="formnote" style="margin-top:0">
-          The field unit runs on a <strong>Hankerila HKL-ER6-S3</strong>, which carries its own
-          RS485 transceiver, a battery-backed DS1307 clock and an OLED &mdash; so no MAX3485 or
-          DS3231 is needed. The ESP32-C3 Super Mini build is kept alongside it for a
-          pocket-sized version later. This tab fills in on the unit's first sync; until the
-          probe is wired, <strong>Add</strong> and CSV import keep the page usable.
+          The field unit is a <strong>Hankerila HKL-ER6-S3</strong>: onboard RS485 to the probe,
+          a battery-backed DS1307 clock and an OLED, powered from 12&nbsp;V. Press
+          <strong>X1</strong> to start a reading and <strong>X2</strong> to save it; readings
+          queue on the unit and appear here on its next WiFi sync. The board has no battery
+          divider, so Battery shows &ldquo;not measured&rdquo;. <strong>Add</strong> and CSV
+          import keep the page usable whether or not the unit is online.
         </div>
       </div>
 
